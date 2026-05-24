@@ -19,7 +19,6 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
@@ -34,12 +33,17 @@ export function ChatPanel() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll chat to bottom (contained within the chat panel only)
+  // Auto-scroll only when user is at the bottom
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
+
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  };
 
   const handleSend = async () => {
     if (!input.trim() || sending) return;
@@ -53,6 +57,7 @@ export function ChatPanel() {
     if (res.ok) {
       setInput("");
       fetchMessages();
+      scrollToBottom();
     }
   };
 
