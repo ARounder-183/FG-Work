@@ -20,6 +20,7 @@ export function ChatPanel() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isFirstLoad = useRef(true);
 
   const fetchMessages = async () => {
     const res = await fetch(apiUrl("/api/chat"));
@@ -33,12 +34,13 @@ export function ChatPanel() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll only when user is at the bottom
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+    if (!el) return;
+    if (isFirstLoad.current || el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
       el.scrollTop = el.scrollHeight;
     }
+    if (messages.length > 0) isFirstLoad.current = false;
   }, [messages]);
 
   const scrollToBottom = () => {
