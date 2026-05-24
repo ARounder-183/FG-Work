@@ -52,12 +52,21 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const reportRef = useRef(onReportPosition);
   reportRef.current = onReportPosition;
   isCurrentUserRef = isCurrentUserSong;
+  const currentSongRef = useRef(currentSong);
+  currentSongRef.current = currentSong;
 
   // Setup audio listeners
   useEffect(() => {
     const a = getAudio();
     const onTime = () => setPosition(a.currentTime);
-    const onEnd = () => window.dispatchEvent(new CustomEvent("music-ended"));
+    const onEnd = () => {
+      const song = currentSongRef.current;
+      if (song && song.duration > 0 && a.currentTime < song.duration * 0.9) {
+        setTimeout(() => a.play().catch(() => {}), 1000);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("music-ended"));
+    };
     const onError = () => {
       // Client-side error - retry playing, don't skip
       setTimeout(() => {
@@ -88,16 +97,27 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     setCoverUrl(null);
     setLyric(null);
     fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
-    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
-    fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
-      if(d.url && singletonAudio){
-        singletonAudio.src = d.url;
-        singletonAudio.currentTime = 0;
-        if (isPlaying) singletonAudio.play().catch(()=>{});
-      } else {
-        autoSkip();
-      }
-    });
+
+    // Fetch song URL with retries
+    let retries = 0;
+    const tryFetchUrl = () => {
+      fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
+      fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
+        if(d.url && singletonAudio){
+          singletonAudio.src = d.url;
+          singletonAudio.currentTime = 0;
+          if (isPlaying) singletonAudio.play().catch(()=>{});
+        } else {
+          retries++;
+          if (retries < 3) {
+            setTimeout(tryFetchUrl, 2000);
+          } else {
+            autoSkip();
+          }
+        }
+      });
+    };
+    tryFetchUrl();
   }, [currentSong?.id]);
 
   // Play/pause sync

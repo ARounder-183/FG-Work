@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
 
   if (type === "playlist") {
     const all = await searchPlaylists(keywords, offset + limit + 1);
-    console.log(`[NCM] Playlist search: ${all.length} results for "${keywords}"`);
     const page = all.slice(offset, offset + limit);
     return Response.json({
       playlists: page,
@@ -22,7 +21,6 @@ export async function GET(req: NextRequest) {
   }
 
   const all = await searchSongs(keywords, offset + limit + 1);
-  console.log(`[NCM] Song search: ${all.length} results for "${keywords}", first: ${JSON.stringify(all[0]?.artists)}`);
   const page = all.slice(offset, offset + limit);
   return Response.json({
     songs: page,

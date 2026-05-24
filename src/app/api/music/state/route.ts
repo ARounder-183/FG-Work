@@ -55,9 +55,22 @@ export async function GET() {
     }
   }
 
-  const users = await prisma.user.findMany({
+  // Sort users by whose song plays next (first unplayed song's sortOrder)
+  const userSongOrder = await prisma.userSong.findMany({
+    where: { played: false },
+    orderBy: { sortOrder: "asc" },
+    select: { userId: true, sortOrder: true },
+  });
+  const userOrderMap = new Map<string, number>();
+  userSongOrder.forEach((s) => { if (!userOrderMap.has(s.userId)) userOrderMap.set(s.userId, s.sortOrder); });
+
+  const users = (await prisma.user.findMany({
     where: { id: { in: queueOrder } },
     select: { id: true, username: true, avatar: true },
+  })).sort((a, b) => {
+    const aOrder = userOrderMap.get(a.id) ?? 999999;
+    const bOrder = userOrderMap.get(b.id) ?? 999999;
+    return aOrder - bOrder;
   });
 
   // Find current user's turn

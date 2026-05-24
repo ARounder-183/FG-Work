@@ -91,13 +91,12 @@ function mapSongs(raw: NcmSongRaw[]): Song[] {
 
 export async function searchSongs(keywords: string, limit = 50): Promise<Song[]> {
   const data = await ncm<{ result?: { songs?: NcmSongRaw[] }; body?: { result?: { songs?: NcmSongRaw[] } } }>("/search", { keywords, limit, type: 1 });
-  // Try both response formats: {result:{songs:[]}} and {body:{result:{songs:[]}}}
   const raw = data?.result?.songs || data?.body?.result?.songs || [];
   return mapSongs(raw);
 }
 
 export async function searchPlaylists(keywords: string, limit = 30) {
-  const data = await ncm<{ result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number }> }; body?: { result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number }> } } }>("/search", { keywords, limit, type: 1000 });
+  const data = await ncm<{ result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string } }> }; body?: { result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string } }> } } }>("/search", { keywords, limit, type: 1000 });
   return data?.result?.playlists || data?.body?.result?.playlists || [];
 }
 

@@ -11,7 +11,7 @@ interface Song {
   id: number; name: string; artists: string; album: string; duration: number; picUrl?: string;
 }
 interface MySong { id: string; songData: string; sortOrder: number; }
-interface PlaylistResult { id: number; name: string; coverImgUrl?: string; trackCount?: number; }
+interface PlaylistResult { id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string }; }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
 
@@ -117,7 +117,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">🎵</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[11px] font-medium">{p.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{p.trackCount||"?"} 首</div>
+                    <div className="text-[10px] text-muted-foreground">{p.trackCount||"?"} 首{p.creator ? ` · ${p.creator.nickname}` : ""}</div>
                   </div>
                 </div>
               ))}
