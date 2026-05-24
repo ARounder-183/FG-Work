@@ -128,3 +128,5 @@
     @apply font-sans;
   }
 }
+
+/* Theme toggle circular reveal — driven by injected <style> in navbar.tsx */
