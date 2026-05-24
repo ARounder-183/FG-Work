@@ -61,7 +61,9 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     const onTime = () => setPosition(a.currentTime);
     const onEnd = () => {
       const song = currentSongRef.current;
-      if (song && song.duration > 0 && a.currentTime < song.duration * 0.9) {
+      const playedEnough = song && song.duration > 0 && a.currentTime >= song.duration * 0.9;
+      if (!playedEnough) {
+        // Premature end or unknown duration - retry playback
         setTimeout(() => a.play().catch(() => {}), 1000);
         return;
       }
