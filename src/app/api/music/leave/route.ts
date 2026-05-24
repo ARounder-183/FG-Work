@@ -15,8 +15,12 @@ export async function POST() {
       data: { queueOrder: JSON.stringify(updated) },
     });
 
-    // Clean up user's votes
+    // Clean up user's votes and mark their songs as played
     await prisma.skipVote.deleteMany({ where: { userId: user.id } });
+    await prisma.userSong.updateMany({
+      where: { userId: user.id, played: false },
+      data: { played: true },
+    });
 
     // If no users left, stop playback immediately
     if (updated.length === 0) {

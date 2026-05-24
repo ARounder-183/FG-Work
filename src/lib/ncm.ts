@@ -20,6 +20,7 @@ interface NcmSongRaw {
   artists?: { name: string }[] | string;
   al?: { name: string; picUrl?: string };
   dt?: number;
+  duration?: number;
 }
 
 interface NcmSearchResult {
@@ -78,7 +79,7 @@ async function ncm<T>(path: string, params: Record<string, string | number> = {}
 
 function mapSongs(raw: NcmSongRaw[]): Song[] {
   return raw.map((s) => {
-    const dtMs = s.dt || 0;
+    const dtMs = s.dt || s.duration || 0;
     let artistStr = "";
     if (s.ar?.length) {
       artistStr = s.ar.map((a) => a.name).join(" / ");
