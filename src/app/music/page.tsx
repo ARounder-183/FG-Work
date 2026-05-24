@@ -94,16 +94,16 @@ export default function MusicPage() {
   if (loading) return <div className="mx-auto max-w-5xl px-4 py-8"><Skeleton className="h-96 w-full" /></div>;
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
+    <div className="flex h-full overflow-hidden">
       {/* Left: Player + Chat */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-h-0">
         <div className="flex items-center justify-center gap-3 border-b px-4 py-2">
           <span className="text-xs text-muted-foreground">{activeUsers.length} 人在线</span>
           {!joined
             ? <Button size="sm" onClick={api.join} disabled={!user}>{user ? "加入" : "请登录"}</Button>
             : <Button size="sm" variant="outline" onClick={api.leave}>离开</Button>}
         </div>
-        <div className="flex flex-1 items-center justify-center px-4">
+        <div className="flex flex-1 items-center justify-center px-4 min-h-0 overflow-y-auto">
           <MainPlayer
             currentSong={joined ? currentSong : null}
             isPlaying={joined ? isPlaying : false}
