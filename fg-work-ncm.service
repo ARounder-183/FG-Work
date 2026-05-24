@@ -1,0 +1,16 @@
+[Unit]
+Description=FG自习室 - 网易云API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/fg-work
+ExecStart=/usr/bin/node node_modules/@neteasecloudmusicapienhanced/api/app.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=4000
+
+[Install]
+WantedBy=multi-user.target

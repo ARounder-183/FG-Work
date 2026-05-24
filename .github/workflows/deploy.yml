@@ -1,0 +1,59 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 139.196.26.34
+          username: root
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          script: |
+            set -e
+            cd /opt/FG-Work || { echo "Project directory not found"; exit 1; }
+
+            echo "=== Backing up database ==="
+            cp dev.db dev.db.bak 2>/dev/null || true
+
+            echo "=== Stashing local changes ==="
+            git stash 2>/dev/null || true
+
+            echo "=== Pulling latest code ==="
+            git pull origin main
+
+            echo "=== Restoring stashed files (database, env) ==="
+            git stash pop 2>/dev/null || true
+
+            echo "=== Installing dependencies ==="
+            npm install
+
+            echo "=== Generating Prisma client ==="
+            npx prisma generate
+
+            echo "=== Running database migrations ==="
+            npx prisma migrate deploy
+
+            echo "=== Building application ==="
+            npm run build
+
+            echo "=== Registering systemd services ==="
+            cp fg-work.service /etc/systemd/system/fg-work.service
+            cp fg-work-ncm.service /etc/systemd/system/fg-work-ncm.service
+            systemctl daemon-reload
+
+            echo "=== Restarting services ==="
+            systemctl restart fg-work-ncm
+            systemctl restart fg-work
+
+            echo "=== Checking status ==="
+            systemctl status fg-work --no-pager -l
+            systemctl status fg-work-ncm --no-pager -l
+
+            echo "=== Deployment complete ==="
