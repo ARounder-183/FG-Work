@@ -41,7 +41,7 @@ jobs:
             npx prisma migrate deploy
 
             echo "=== Building application ==="
-            npm run build
+            NODE_OPTIONS="--max-old-space-size=512" npm run build
 
             echo "=== Registering systemd services ==="
             cp fg-work.service /etc/systemd/system/fg-work.service
