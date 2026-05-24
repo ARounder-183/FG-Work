@@ -15,6 +15,14 @@ export async function GET() {
     });
   }
 
+  // Clean up songs from users who left (one-time, after fix deployed)
+  if (queueOrder.length > 0) {
+    await prisma.userSong.updateMany({
+      where: { played: false, userId: { notIn: queueOrder } },
+      data: { played: true },
+    });
+  }
+
   // No unplayed songs → clear
   const unplayedCount = await prisma.userSong.count({ where: { played: false } });
   if (unplayedCount === 0 && state.currentSong) {
