@@ -43,16 +43,24 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     const offset = append ? nextOffset : 0;
     const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}&offset=${offset}`));
     const d = await r.json();
-    if (tab === "song") {
-      setSongs(append ? [...songs, ...(d.songs || [])] : (d.songs || []));
-      setPlaylists([]);
-    } else {
-      setPlaylists(append ? [...playlists, ...(d.playlists || [])] : (d.playlists || []));
-      setSongs([]);
-    }
+
+    const resultKey = tab === "song" ? "songs" : "playlists";
+    const current = tab === "song" ? songs : playlists;
+    const setFn = tab === "song" ? setSongs : setPlaylists;
+    const clearFn = tab === "song" ? setPlaylists : setSongs;
+
+    setFn(append ? [...current, ...(d[resultKey] || [])] : (d[resultKey] || []));
+    clearFn([]);
     setHasMore(d.hasMore || false);
     setNextOffset(d.nextOffset || 0);
     setSearching(false);
+  };
+
+  // Reset pagination when switching tabs
+  const handleTabChange = (val: string) => {
+    setTab(val);
+    setHasMore(false);
+    setNextOffset(0);
   };
   const loadPlaylist = async (id: number) => {
     const r = await fetch(apiUrl(`/api/music/playlist?id=${id}`));
@@ -65,7 +73,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     <>
       {/* Search panel (left of the two) */}
       {searchOpen && (
-        <div className="flex w-60 shrink-0 flex-col border-l bg-background">
+        <div className="flex w-60 shrink-0 flex-col border-l bg-background max-h-[calc(100vh-3.5rem)] overflow-hidden">
           <div className="flex items-center justify-between border-b px-2.5 py-2">
             <span className="text-xs font-semibold">添加歌曲</span>
             <button onClick={() => setSearchOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
@@ -74,7 +82,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
             <Input placeholder="搜索" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} className="h-6 text-[10px]" />
               <Button size="sm" className="h-6 text-[10px]" onClick={() => search()} disabled={searching}>{searching?"..":"搜索"}</Button>
           </div>
-          <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col overflow-hidden">
+          <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
             <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">
               <TabsTrigger value="song" className="text-[10px] h-6">单曲</TabsTrigger>
               <TabsTrigger value="playlist" className="text-[10px] h-6">歌单</TabsTrigger>
@@ -124,7 +132,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
 
       {/* My playlist panel (right of search) */}
       {myOpen && (
-        <div className="flex w-60 shrink-0 flex-col border-l bg-background">
+        <div className="flex w-60 shrink-0 flex-col border-l bg-background max-h-[calc(100vh-3.5rem)] overflow-hidden">
           <div className="flex items-center justify-between border-b px-2.5 py-2">
             <span className="text-xs font-semibold">我的歌单 ({mySongs.length})</span>
             <button onClick={() => setMyOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>

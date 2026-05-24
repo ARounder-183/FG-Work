@@ -6,17 +6,26 @@ export async function GET(req: NextRequest) {
   const keywords = searchParams.get("q");
   const type = searchParams.get("type") || "song";
   const offset = parseInt(searchParams.get("offset") || "0");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 50);
+  const limit = Math.min(parseInt(searchParams.get("limit") || "30"), 50);
 
   if (!keywords) return Response.json({ error: "请输入搜索关键词" }, { status: 400 });
 
   if (type === "playlist") {
-    const playlists = await searchPlaylists(keywords, limit + offset);
-    const hasMore = playlists.length > limit + offset;
-    return Response.json({ playlists: playlists.slice(offset, offset + limit), hasMore, nextOffset: offset + limit });
+    // Request extra to detect hasMore
+    const all = await searchPlaylists(keywords, offset + limit + 1);
+    const page = all.slice(offset, offset + limit);
+    return Response.json({
+      playlists: page,
+      hasMore: all.length > offset + limit,
+      nextOffset: offset + limit,
+    });
   }
 
-  const songs = await searchSongs(keywords, limit + offset);
-  const hasMore = songs.length > limit + offset;
-  return Response.json({ songs: songs.slice(offset, offset + limit), hasMore, nextOffset: offset + limit });
+  const all = await searchSongs(keywords, offset + limit + 1);
+  const page = all.slice(offset, offset + limit);
+  return Response.json({
+    songs: page,
+    hasMore: all.length > offset + limit,
+    nextOffset: offset + limit,
+  });
 }
