@@ -12,6 +12,7 @@ interface Song {
 }
 interface MySong { id: string; songData: string; sortOrder: number; }
 interface PlaylistResult { id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string }; }
+interface DjRadio { id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string }; }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
 
@@ -33,6 +34,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   const [query, setQuery] = useState("");
   const [songs, setSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistResult[]>([]);
+  const [djRadios, setDjRadios] = useState<DjRadio[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
@@ -45,13 +47,16 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}&offset=${offset}`));
     const d = await r.json();
 
-    const resultKey = tab === "song" ? "songs" : "playlists";
-    const current = tab === "song" ? songs : playlists;
-    const setFn = tab === "song" ? setSongs : setPlaylists;
-    const clearFn = tab === "song" ? setPlaylists : setSongs;
+    const resultKey = tab === "song" ? "songs" : tab === "dj" ? "djRadios" : "playlists";
+    const current = tab === "song" ? songs : tab === "dj" ? djRadios : playlists;
+    const setFn = tab === "song" ? setSongs : tab === "dj" ? setDjRadios : setPlaylists;
+    const clearFn1 = tab === "song" ? setPlaylists : setSongs;
+    const clearFn2 = tab === "song" ? setDjRadios : setDjRadios;
 
     setFn(append ? [...current, ...(d[resultKey] || [])] : (d[resultKey] || []));
-    clearFn([]);
+    if (tab === "song") { setPlaylists([]); setDjRadios([]); }
+    else if (tab === "dj") { setSongs([]); setPlaylists([]); }
+    else { setSongs([]); setDjRadios([]); }
     setHasMore(d.hasMore || false);
     setNextOffset(d.nextOffset || 0);
     setSearching(false);
@@ -70,6 +75,13 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     else toast.error("加载失败");
   };
 
+  const loadDjRadio = async (id: number) => {
+    const r = await fetch(apiUrl(`/api/music/dj?id=${id}`));
+    const d = await r.json();
+    if (d.songs?.length) { setSongs(d.songs); setTab("song"); toast.success(`已加载电台节目`); }
+    else toast.error("加载失败");
+  };
+
   return (
     <>
       {/* Search panel (left of the two) */}
@@ -84,9 +96,10 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
               <Button size="sm" className="h-6 text-[10px]" onClick={() => search()} disabled={searching}>{searching?"..":"搜索"}</Button>
           </div>
           <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
-            <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">
+            <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-3">
               <TabsTrigger value="song" className="text-[10px] h-6">单曲</TabsTrigger>
               <TabsTrigger value="playlist" className="text-[10px] h-6">歌单</TabsTrigger>
+              <TabsTrigger value="dj" className="text-[10px] h-6">电台</TabsTrigger>
             </TabsList>
             <TabsContent value="song" className="flex-1 overflow-y-auto">
               {songs.length>0 && (
@@ -118,6 +131,22 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[11px] font-medium">{p.name}</div>
                     <div className="text-[10px] text-muted-foreground">{p.trackCount||"?"} 首{p.creator ? ` · ${p.creator.nickname}` : ""}</div>
+                  </div>
+                </div>
+              ))}
+              {hasMore && (
+                <div className="border-b px-1.5 py-1">
+                  <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="dj" className="flex-1 overflow-y-auto divide-y">
+              {djRadios.map(r=>(
+                <div key={r.id} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1.5 hover:bg-accent" onClick={()=>loadDjRadio(r.id)}>
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">📻</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] font-medium">{r.name}</div>
+                    <div className="text-[10px] text-muted-foreground">{r.programCount||"?"} 期{r.dj ? ` · ${r.dj.nickname}` : ""}</div>
                   </div>
                 </div>
               ))}

@@ -17,6 +17,7 @@ interface NcmSongRaw {
   id: number;
   name: string;
   ar?: { name: string }[];
+  artists?: { name: string }[] | string;
   al?: { name: string; picUrl?: string };
   dt?: number;
 }
@@ -78,10 +79,18 @@ async function ncm<T>(path: string, params: Record<string, string | number> = {}
 function mapSongs(raw: NcmSongRaw[]): Song[] {
   return raw.map((s) => {
     const dtMs = s.dt || 0;
+    let artistStr = "";
+    if (s.ar?.length) {
+      artistStr = s.ar.map((a) => a.name).join(" / ");
+    } else if (Array.isArray(s.artists)) {
+      artistStr = s.artists.map((a: { name: string }) => a.name).join(" / ");
+    } else if (typeof s.artists === "string") {
+      artistStr = s.artists;
+    }
     return {
       id: s.id,
       name: s.name,
-      artists: (s.ar || []).map((a) => a.name).join(" / "),
+      artists: artistStr,
       album: s.al?.name || "",
       duration: dtMs > 0 ? Math.floor(dtMs / 1000) : 0,
       picUrl: s.al?.picUrl,
@@ -105,6 +114,17 @@ export async function getPlaylistDetail(id: string | number) {
   const pl = data?.playlist || data?.body?.playlist;
   if (pl) return { name: pl.name, tracks: mapSongs(pl.tracks) };
   return null;
+}
+
+export async function searchDjRadios(keywords: string, limit = 30) {
+  const data = await ncm<{ result?: { djRadios?: Array<{ id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string } }> }; body?: { result?: { djRadios?: Array<{ id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string } }> } } }>("/dj/search", { keywords, limit });
+  return data?.result?.djRadios || data?.body?.result?.djRadios || [];
+}
+
+export async function getDjPrograms(rid: string | number, limit = 50) {
+  const data = await ncm<{ programs?: Array<{ mainSong: NcmSongRaw }>; body?: { programs?: Array<{ mainSong: NcmSongRaw }> } }>("/dj/program", { rid: String(rid), limit });
+  const programs = data?.programs || data?.body?.programs || [];
+  return mapSongs(programs.map((p) => p.mainSong));
 }
 
 export async function getSongUrl(id: string | number): Promise<string | null> {

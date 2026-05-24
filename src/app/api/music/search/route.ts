@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { searchSongs, searchPlaylists } from "@/lib/ncm";
+import { searchSongs, searchPlaylists, searchDjRadios } from "@/lib/ncm";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,6 +15,16 @@ export async function GET(req: NextRequest) {
     const page = all.slice(offset, offset + limit);
     return Response.json({
       playlists: page,
+      hasMore: all.length > offset + limit,
+      nextOffset: offset + limit,
+    });
+  }
+
+  if (type === "dj") {
+    const all = await searchDjRadios(keywords, offset + limit + 1);
+    const page = all.slice(offset, offset + limit);
+    return Response.json({
+      djRadios: page,
       hasMore: all.length > offset + limit,
       nextOffset: offset + limit,
     });
