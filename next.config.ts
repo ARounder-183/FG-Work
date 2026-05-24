@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: "/fg-work",
+  /* config options here */
 };
 
 export default nextConfig;
