@@ -120,14 +120,16 @@ export default function MusicPage() {
           />
         </div>
 
-        {/* Global queue */}
-        <div className="mx-4 mt-4 w-full max-w-md self-center">
-          <button onClick={() => setQueueOpen(!queueOpen)} className="flex w-full items-center justify-between rounded-lg border bg-card p-2 text-xs font-medium hover:bg-accent">
-            全局播放列表 ({fullQueue.length})
-            <span className="text-muted-foreground">{queueOpen ? "收起" : "展开"}</span>
-          </button>
-          {queueOpen && (
-            <div className="max-h-48 overflow-y-auto divide-y rounded-b-lg border border-t-0 bg-card">
+        {/* Bottom row: Chat + Global queue side by side */}
+        <div className="mx-4 mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChatPanel />
+          <div>
+            <button onClick={() => setQueueOpen(!queueOpen)} className="flex w-full items-center justify-between rounded-lg border bg-card p-2 text-xs font-medium hover:bg-accent">
+              下一首 ({fullQueue.length} 首)
+              <span className="text-muted-foreground">{queueOpen ? "收起" : "展开"}</span>
+            </button>
+            {queueOpen && (
+              <div className="max-h-48 overflow-y-auto divide-y rounded-b-lg border border-t-0 bg-card">
               {(() => {
                 // Group by user, show only first song per user
                 const seen = new Set<string>();
@@ -155,9 +157,6 @@ export default function MusicPage() {
             </div>
           )}
         </div>
-
-        <div className="mx-4 mb-4 max-w-md">
-          <ChatPanel />
         </div>
       </div>
 
