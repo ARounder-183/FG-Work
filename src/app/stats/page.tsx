@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -37,14 +38,14 @@ export default function StatsPage() {
 
   const fetchStreak = useCallback(async () => {
     if (!user) return;
-    const r = await fetch("/api/stats/streak");
+    const r = await fetch(apiUrl("/api/stats/streak"));
     const d = await r.json();
     if (d.streak !== undefined) setStreak(d);
   }, [user]);
 
   const fetchCalendar = useCallback(async (year: number, month: number) => {
     if (!user) return;
-    const r = await fetch(`/api/stats/calendar?month=${year}-${String(month).padStart(2, "0")}`);
+    const r = await fetch(apiUrl(`/api/stats/calendar?month=${year}-${String(month).padStart(2, "0")}`));
     const d = await r.json();
     setCalendarDays(d.days || []);
   }, [user]);

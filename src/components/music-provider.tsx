@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 interface MusicCtx {
@@ -16,7 +17,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const r = await fetch("/api/music/state");
+        const r = await fetch(apiUrl("/api/music/state"));
         const d = await r.json();
         if (d.state?.currentSong) {
           setCurrentSong(d.state.currentSong);

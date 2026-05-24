@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
@@ -29,7 +30,7 @@ export default function PostsPage() {
   const fetchPosts = useCallback(async (cursor?: string) => {
     const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
-    const res = await fetch(`/api/posts?${params}`);
+    const res = await fetch(apiUrl(`/api/posts?${params}`));
     return res.json();
   }, []);
 

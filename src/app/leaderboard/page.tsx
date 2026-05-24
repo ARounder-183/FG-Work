@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -34,7 +35,7 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/leaderboard?period=${period}`)
+    fetch(apiUrl(`/api/leaderboard?period=${period}`))
       .then((r) => r.json())
       .then((data) => {
         setRankings(data.rankings || []);

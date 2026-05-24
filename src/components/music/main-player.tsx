@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -73,8 +74,8 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     singletonLastId = currentSong.id;
 
     setCoverUrl(null);
-    fetch(`/api/music/song/detail?id=${currentSong.id}`).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
-    fetch(`/api/music/song?id=${currentSong.id}`).then(r=>r.json()).then(d=>{
+    fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
+    fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
       if(d.url && singletonAudio){
         singletonAudio.src = d.url;
         singletonAudio.currentTime = 0;

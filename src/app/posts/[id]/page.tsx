@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/components/auth-provider";
+import { apiUrl } from "@/lib/url";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,7 +42,7 @@ export default function PostDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   const fetchPost = async () => {
-    const res = await fetch(`/api/posts/${id}`);
+    const res = await fetch(apiUrl(`/api/posts/${id}`));
     const data = await res.json();
     if (data.post) setPost(data.post);
     setLoading(false);
@@ -55,7 +56,7 @@ export default function PostDetailPage() {
   const handleComment = async () => {
     if (!commentText.trim()) return;
     setSubmitting(true);
-    const res = await fetch(`/api/posts/${id}/comments`, {
+    const res = await fetch(apiUrl(`/api/posts/${id}/comments`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: commentText.trim() }),
@@ -71,7 +72,7 @@ export default function PostDetailPage() {
   };
 
   const handleDeleteComment = async (cid: string) => {
-    const res = await fetch(`/api/posts/${id}/comments/${cid}`, { method: "DELETE" });
+    const res = await fetch(apiUrl(`/api/posts/${id}/comments/${cid}`), { method: "DELETE" });
     if (res.ok) {
       toast.success("已删除");
       await fetchPost();
@@ -81,7 +82,7 @@ export default function PostDetailPage() {
   const handleDeletePost = async () => {
     if (!confirm("确定删除这篇帖子？")) return;
     setDeleting(true);
-    const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
+    const res = await fetch(apiUrl(`/api/posts/${id}`), { method: "DELETE" });
     setDeleting(false);
     if (res.ok) {
       toast.success("已删除");

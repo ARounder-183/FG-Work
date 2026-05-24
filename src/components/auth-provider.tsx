@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 interface User {
@@ -29,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me");
+      const res = await fetch(apiUrl("/api/auth/me"));
       const data = await res.json();
       setUser(data.user);
     } catch {
@@ -44,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = async (username: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(apiUrl("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (username: string, password: string) => {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(apiUrl("/api/auth/register"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -72,12 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(apiUrl("/api/auth/logout"), { method: "POST" });
     setUser(null);
   };
 
   const updateProfile = async (data: { username?: string; bio?: string }) => {
-    const res = await fetch("/api/user/profile", {
+    const res = await fetch(apiUrl("/api/user/profile"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const uploadAvatar = async (file: File) => {
     const formData = new FormData();
     formData.append("avatar", file);
-    const res = await fetch("/api/user/avatar", {
+    const res = await fetch(apiUrl("/api/user/avatar"), {
       method: "POST",
       body: formData,
     });

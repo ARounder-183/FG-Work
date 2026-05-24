@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,14 +38,14 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     if (!query.trim()) return;
     setSearching(true);
     const type = tab === "song" ? "song" : "playlist";
-    const r = await fetch(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}`);
+    const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}`));
     const d = await r.json();
     if (tab === "song") { setSongs(d.songs || []); setPlaylists([]); }
     else { setPlaylists(d.playlists || []); setSongs([]); }
     setSearching(false);
   };
   const loadPlaylist = async (id: number) => {
-    const r = await fetch(`/api/music/playlist?id=${id}`);
+    const r = await fetch(apiUrl(`/api/music/playlist?id=${id}`));
     const d = await r.json();
     if (d.playlist?.tracks) { setSongs(d.playlist.tracks); setTab("song"); toast.success(`已加载：${d.playlist.name}`); }
     else toast.error("加载失败");

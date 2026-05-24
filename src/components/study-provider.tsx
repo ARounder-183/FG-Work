@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./auth-provider";
 
@@ -32,8 +33,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const [activeRes, todayRes] = await Promise.all([
-        fetch("/api/checkin/active"),
-        fetch("/api/checkin/today"),
+        fetch(apiUrl("/api/checkin/active")),
+        fetch(apiUrl("/api/checkin/today")),
       ]);
       const activeData = await activeRes.json();
       const todayData = await todayRes.json();

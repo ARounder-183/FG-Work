@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { apiUrl } from "@/lib/url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +24,7 @@ export default function EditPostPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch(`/api/posts/${id}`)
+    fetch(apiUrl(`/api/posts/${id}`))
       .then((r) => r.json())
       .then((data) => {
         if (data.post) {
@@ -43,7 +44,7 @@ export default function EditPostPage() {
     setUploading(true);
     const formData = new FormData();
     formData.append("image", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const res = await fetch(apiUrl("/api/upload"), { method: "POST", body: formData });
     const data = await res.json();
     setUploading(false);
     if (data.url) setImages((prev) => [...prev, data.url]);
@@ -54,7 +55,7 @@ export default function EditPostPage() {
   const handleSave = async () => {
     if (!title.trim()) return toast.error("请输入标题");
     setSaving(true);
-    const res = await fetch(`/api/posts/${id}`, {
+    const res = await fetch(apiUrl(`/api/posts/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: title.trim(), content: content.trim(), images }),

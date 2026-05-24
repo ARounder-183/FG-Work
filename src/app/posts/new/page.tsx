@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -39,7 +40,7 @@ export default function NewPostPage() {
     setUploading(true);
     const formData = new FormData();
     formData.append("image", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const res = await fetch(apiUrl("/api/upload"), { method: "POST", body: formData });
     const data = await res.json();
     setUploading(false);
 
@@ -61,7 +62,7 @@ export default function NewPostPage() {
     if (!content.trim()) return toast.error("请输入内容");
 
     setPublishing(true);
-    const res = await fetch("/api/posts", {
+    const res = await fetch(apiUrl("/api/posts"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: title.trim(), content: content.trim(), images }),

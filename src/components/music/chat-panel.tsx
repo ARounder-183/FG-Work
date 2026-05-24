@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
-    const res = await fetch("/api/chat");
+    const res = await fetch(apiUrl("/api/chat"));
     const data = await res.json();
     setMessages(data.messages || []);
   };
@@ -43,7 +44,7 @@ export function ChatPanel() {
   const handleSend = async () => {
     if (!input.trim() || sending) return;
     setSending(true);
-    const res = await fetch("/api/chat", {
+    const res = await fetch(apiUrl("/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: input.trim() }),

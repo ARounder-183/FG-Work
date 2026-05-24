@@ -1,5 +1,6 @@
 "use client";
 
+import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { useStudy } from "@/components/study-provider";
@@ -43,7 +44,7 @@ export default function StudyPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchTopics = async () => {
-    const res = await fetch("/api/topics");
+    const res = await fetch(apiUrl("/api/topics"));
     const data = await res.json();
     setTopics(data.topics);
   };
@@ -52,8 +53,8 @@ export default function StudyPage() {
     if (!user) { setLoading(false); return; }
     try {
       const [activeRes, todayRes] = await Promise.all([
-        fetch("/api/checkin/active"),
-        fetch("/api/checkin/today"),
+        fetch(apiUrl("/api/checkin/active")),
+        fetch(apiUrl("/api/checkin/today")),
       ]);
       if (activeRes.ok) {
         const activeData = await activeRes.json();
@@ -95,7 +96,7 @@ export default function StudyPage() {
       // If hidden for > 30min, stop on next visibility
       if (document.hidden && active) {
         const timeout = setTimeout(async () => {
-          await fetch("/api/checkin/stop", { method: "POST" });
+          await fetch(apiUrl("/api/checkin/stop"), { method: "POST" });
           window.location.reload();
         }, 30 * 60 * 1000);
         const onVisible = () => { clearTimeout(timeout); document.removeEventListener("visibilitychange", onVisible); };
@@ -112,7 +113,7 @@ export default function StudyPage() {
     if (!active) return;
     const hoursRunning = (Date.now() - new Date(active.startedAt).getTime()) / 3600000;
     if (hoursRunning > 12) {
-      fetch("/api/checkin/stop", { method: "POST" }).then(() => {
+      fetch(apiUrl("/api/checkin/stop"), { method: "POST" }).then(() => {
         setActive(null);
         toast("检测到异常计时，已自动停止");
       });
@@ -121,7 +122,7 @@ export default function StudyPage() {
 
   const handleStart = async (topicId: string) => {
     setStartingTopic(topicId);
-    const res = await fetch("/api/checkin/start", {
+    const res = await fetch(apiUrl("/api/checkin/start"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topicId }),
@@ -139,7 +140,7 @@ export default function StudyPage() {
 
   const handleStop = async () => {
     setStopping(true);
-    const res = await fetch("/api/checkin/stop", { method: "POST" });
+    const res = await fetch(apiUrl("/api/checkin/stop"), { method: "POST" });
     const data = await res.json();
     setStopping(false);
     if (data.checkIn) {
@@ -156,7 +157,7 @@ export default function StudyPage() {
   const handleCreateTopic = async () => {
     if (!newTopic.trim()) return;
     setCreating(true);
-    const res = await fetch("/api/topics", {
+    const res = await fetch(apiUrl("/api/topics"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newTopic.trim(), icon: newIcon }),
