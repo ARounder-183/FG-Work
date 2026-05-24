@@ -4,10 +4,13 @@ import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const period = searchParams.get("period") || "all"; // "week" | "month" | "all"
+  const period = searchParams.get("period") || "all"; // "today" | "week" | "month" | "all"
 
   let startDate: Date | undefined;
-  if (period === "week") {
+  if (period === "today") {
+    startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+  } else if (period === "week") {
     startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);

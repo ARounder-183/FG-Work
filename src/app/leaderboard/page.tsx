@@ -23,7 +23,7 @@ interface TopicDist {
   percentage: number;
 }
 
-type Period = "week" | "month" | "all";
+type Period = "today" | "week" | "month" | "all";
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
@@ -66,14 +66,14 @@ export default function LeaderboardPage() {
 
       {/* Period tabs */}
       <div className="flex gap-2">
-        {(["all", "month", "week"] as const).map((p) => (
+        {(["today", "week", "month", "all"] as const).map((p) => (
           <Button
             key={p}
             variant={period === p ? "default" : "outline"}
             size="sm"
             onClick={() => setPeriod(p)}
           >
-            {p === "all" ? "全部时间" : p === "month" ? "本月" : "本周"}
+            {p === "all" ? "全部" : p === "month" ? "本月" : p === "week" ? "本周" : "本日"}
           </Button>
         ))}
       </div>
