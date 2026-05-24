@@ -4,6 +4,7 @@ import path from "path";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "posts");
 const MAX_SIZE = 5 * 1024 * 1024;
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filepath, buffer);
 
-    return Response.json({ url: `/uploads/posts/${filename}` });
+    return Response.json({ url: `${BASE}/uploads/posts/${filename}` });
   } catch {
     return Response.json({ error: "上传失败" }, { status: 500 });
   }

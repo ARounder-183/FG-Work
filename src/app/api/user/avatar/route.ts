@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
-const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_SIZE = 2 * 1024 * 1024;
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filepath, buffer);
 
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    const avatarUrl = `${BASE}/uploads/avatars/${filename}`;
 
     const updated = await prisma.user.update({
       where: { id: user.id },

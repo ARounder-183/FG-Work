@@ -88,7 +88,7 @@ export default function StudyPage() {
   useEffect(() => {
     const stopIfActive = () => {
       if (active) {
-        navigator.sendBeacon("/api/checkin/stop");
+        navigator.sendBeacon(apiUrl("/api/checkin/stop"));
       }
     };
     window.addEventListener("beforeunload", stopIfActive);

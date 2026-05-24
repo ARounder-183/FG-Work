@@ -46,3 +46,4 @@ next-env.d.ts
 *.db-wal
 public/uploads/
 基本需求.md
+dev.db

@@ -27,8 +27,10 @@ export default function MusicPage() {
   const [skipVotes, setSkipVotes] = useState<string[]>([]);
   const [skipThreshold, setSkipThreshold] = useState(1);
   const [currentUserSong, setCurrentUserSong] = useState<CurrentUserSong | null>(null);
+  const [fullQueue, setFullQueue] = useState<Array<{id:string;songData:string;userId:string;user:{username:string;avatar:string|null}}>>([]);
   const [serverPosition, setServerPosition] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [queueOpen, setQueueOpen] = useState(true);
 
   const fetchMySongs = useCallback(async () => {
     if (!user) return;
@@ -45,6 +47,7 @@ export default function MusicPage() {
       setSkipVotes(d.skipVotes || []);
       setSkipThreshold(d.skipThreshold || 1);
       setCurrentUserSong(d.currentUserSong || null);
+      setFullQueue(d.fullQueue || []);
       setServerPosition(d.state?.position || 0);
     }
     setJoined(user ? d.state?.queueOrder?.includes(user.id) : false);
@@ -53,6 +56,16 @@ export default function MusicPage() {
 
   useEffect(() => { fetchState(); fetchMySongs(); }, [fetchState, fetchMySongs]);
   useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 2000); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
+
+  // Auto-leave on page close
+  useEffect(() => {
+    const leave = () => {
+      if (joined) navigator.sendBeacon(apiUrl("/api/music/leave"));
+    };
+    window.addEventListener("beforeunload", leave);
+    return () => window.removeEventListener("beforeunload", leave);
+  }, [joined]);
+
   useEffect(() => {
     const onEnd = async () => {
       await fetch(apiUrl("/api/music/state"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nextSong: true }) });
@@ -90,8 +103,8 @@ export default function MusicPage() {
         </div>
         <div className="flex flex-1 items-center justify-center px-4">
           <MainPlayer
-            currentSong={currentSong}
-            isPlaying={isPlaying}
+            currentSong={joined ? currentSong : null}
+            isPlaying={joined ? isPlaying : false}
             isCurrentUserSong={currentUserSong?.userId === user?.id}
             serverPosition={serverPosition}
             onSkipVote={api.skipVote}
@@ -103,6 +116,35 @@ export default function MusicPage() {
             onReportPosition={api.reportPosition}
           />
         </div>
+
+        {/* Global queue */}
+        <div className="mx-4 mt-4 w-full max-w-md self-center">
+          <button onClick={() => setQueueOpen(!queueOpen)} className="flex w-full items-center justify-between rounded-lg border bg-card p-2 text-xs font-medium hover:bg-accent">
+            全局播放列表 ({fullQueue.length})
+            <span className="text-muted-foreground">{queueOpen ? "收起" : "展开"}</span>
+          </button>
+          {queueOpen && (
+            <div className="max-h-48 overflow-y-auto divide-y rounded-b-lg border border-t-0 bg-card">
+              {fullQueue.length === 0 ? (
+                <p className="p-3 text-center text-xs text-muted-foreground">队列为空</p>
+              ) : fullQueue.map((item, i) => {
+                const s = JSON.parse(item.songData) as Song;
+                const isCur = currentSong && s.id === currentSong.id;
+                return (
+                  <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${isCur ? "bg-primary/10" : ""}`}>
+                    <span className="w-5 text-center tabular-nums text-muted-foreground">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate ${isCur ? "font-medium text-primary" : ""}`}>{s.name}</div>
+                      <div className="truncate text-muted-foreground/70">{s.artists}</div>
+                    </div>
+                    <span className="shrink-0 text-muted-foreground">{item.user.username}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="mx-4 mb-4 max-w-md">
           <ChatPanel />
         </div>

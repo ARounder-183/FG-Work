@@ -21,6 +21,7 @@ model User {
   comments      Comment[]
   checkIns      CheckIn[]
   studyRecords  StudyRecord[]
+  studyTopics   StudyTopic[]
   musicPlaylists MusicPlaylist[]
   userSongs      UserSong[]
   skipVotes      SkipVote[]
@@ -55,12 +56,16 @@ model Comment {
 // ========== 打卡与计时模块 ==========
 model StudyTopic {
   id        String    @id @default(uuid())
-  name      String    @unique
+  name      String
   icon      String?
+  userId    String
   createdAt DateTime  @default(now())
 
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   checkIns     CheckIn[]
   studyRecords StudyRecord[]
+
+  @@unique([userId, name])
 }
 
 model CheckIn {

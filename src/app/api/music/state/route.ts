@@ -70,6 +70,13 @@ export async function GET() {
     skipVotes = votes.map((v) => v.userId);
   }
 
+  // Full global queue
+  const fullQueue = await prisma.userSong.findMany({
+    where: { played: false },
+    orderBy: { sortOrder: "asc" },
+    include: { user: { select: { id: true, username: true, avatar: true } } },
+  });
+
   return Response.json({
     state: { ...state, currentSong },
     users,
@@ -77,6 +84,7 @@ export async function GET() {
     activeCount: queueOrder.length,
     skipThreshold: Math.ceil(queueOrder.length / 2),
     currentUserSong,
+    fullQueue,
   });
 }
 

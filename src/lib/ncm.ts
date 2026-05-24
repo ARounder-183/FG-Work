@@ -87,13 +87,13 @@ function mapSongs(raw: NcmSongRaw[]): Song[] {
   });
 }
 
-export async function searchSongs(keywords: string, limit = 20): Promise<Song[]> {
+export async function searchSongs(keywords: string, limit = 50): Promise<Song[]> {
   const data = await ncm<NcmSearchResult>("/search", { keywords, limit, type: 1 });
   if (data?.result?.songs) return mapSongs(data.result.songs);
   return [];
 }
 
-export async function searchPlaylists(keywords: string, limit = 10) {
+export async function searchPlaylists(keywords: string, limit = 30) {
   const data = await ncm<NcmPlaylistSearchResult>("/search", { keywords, limit, type: 1000 });
   return data?.result?.playlists || [];
 }

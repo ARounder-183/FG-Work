@@ -33,15 +33,25 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   const [songs, setSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
 
-  const search = async () => {
+  const search = async (append = false) => {
     if (!query.trim()) return;
     setSearching(true);
     const type = tab === "song" ? "song" : "playlist";
-    const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}`));
+    const offset = append ? nextOffset : 0;
+    const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}&offset=${offset}`));
     const d = await r.json();
-    if (tab === "song") { setSongs(d.songs || []); setPlaylists([]); }
-    else { setPlaylists(d.playlists || []); setSongs([]); }
+    if (tab === "song") {
+      setSongs(append ? [...songs, ...(d.songs || [])] : (d.songs || []));
+      setPlaylists([]);
+    } else {
+      setPlaylists(append ? [...playlists, ...(d.playlists || [])] : (d.playlists || []));
+      setSongs([]);
+    }
+    setHasMore(d.hasMore || false);
+    setNextOffset(d.nextOffset || 0);
     setSearching(false);
   };
   const loadPlaylist = async (id: number) => {
@@ -62,7 +72,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
           </div>
           <div className="flex gap-1 border-b px-1.5 py-1">
             <Input placeholder="搜索" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} className="h-6 text-[10px]" />
-            <Button size="sm" className="h-6 text-[10px]" onClick={search} disabled={searching}>{searching?"..":"搜索"}</Button>
+              <Button size="sm" className="h-6 text-[10px]" onClick={() => search()} disabled={searching}>{searching?"..":"搜索"}</Button>
           </div>
           <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col overflow-hidden">
             <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">
@@ -86,6 +96,11 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                   </div>
                 ))}
               </div>
+              {hasMore && (
+                <div className="border-b px-1.5 py-1">
+                  <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="playlist" className="flex-1 overflow-y-auto divide-y">
               {playlists.map(p=>(
@@ -97,6 +112,11 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                   </div>
                 </div>
               ))}
+              {hasMore && (
+                <div className="border-b px-1.5 py-1">
+                  <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
