@@ -12,7 +12,7 @@ interface Song {
 }
 interface MySong { id: string; songData: string; sortOrder: number; }
 interface PlaylistResult { id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string }; }
-interface DjRadio { id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string }; }
+interface DjRadio { id: number; name: string; coverUrl?: string; programCount?: number; dj?: { nickname: string }; }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
 
@@ -42,7 +42,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   const search = async (append = false) => {
     if (!query.trim()) return;
     setSearching(true);
-    const type = tab === "song" ? "song" : "playlist";
+    const type = tab;
     const offset = append ? nextOffset : 0;
     const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}&offset=${offset}`));
     const d = await r.json();
@@ -99,7 +99,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
             <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-3">
               <TabsTrigger value="song" className="text-[10px] h-6">单曲</TabsTrigger>
               <TabsTrigger value="playlist" className="text-[10px] h-6">歌单</TabsTrigger>
-              <TabsTrigger value="dj" className="text-[10px] h-6">电台</TabsTrigger>
+              <TabsTrigger value="dj" className="text-[10px] h-6">播客</TabsTrigger>
             </TabsList>
             <TabsContent value="song" className="flex-1 overflow-y-auto">
               {songs.length>0 && (
@@ -143,7 +143,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
             <TabsContent value="dj" className="flex-1 overflow-y-auto divide-y">
               {djRadios.map(r=>(
                 <div key={r.id} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1.5 hover:bg-accent" onClick={()=>loadDjRadio(r.id)}>
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">📻</div>
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">🎙️</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[11px] font-medium">{r.name}</div>
                     <div className="text-[10px] text-muted-foreground">{r.programCount||"?"} 期{r.dj ? ` · ${r.dj.nickname}` : ""}</div>

@@ -117,8 +117,8 @@ export async function getPlaylistDetail(id: string | number) {
 }
 
 export async function searchDjRadios(keywords: string, limit = 30) {
-  const data = await ncm<{ result?: { djRadios?: Array<{ id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string } }> }; body?: { result?: { djRadios?: Array<{ id: number; name: string; picUrl?: string; programCount?: number; dj?: { nickname: string } }> } } }>("/dj/search", { keywords, limit });
-  return data?.result?.djRadios || data?.body?.result?.djRadios || [];
+  const data = await ncm<{ result?: { voicelist?: Array<{ id: number; name: string; coverUrl?: string; programCount?: number; dj?: { nickname: string } }> }; body?: { result?: { voicelist?: Array<{ id: number; name: string; coverUrl?: string; programCount?: number; dj?: { nickname: string } }> } } }>("/voicelist/search", { keyword: keywords, limit });
+  return data?.result?.voicelist || data?.body?.result?.voicelist || [];
 }
 
 export async function getDjPrograms(rid: string | number, limit = 50) {
