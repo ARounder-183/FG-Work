@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filepath, buffer);
 
-    return Response.json({ url: `${BASE}/uploads/posts/${filename}` });
+    return Response.json({ url: `${BASE}/api/static/posts/${filename}` });
   } catch {
     return Response.json({ error: "上传失败" }, { status: 500 });
   }
