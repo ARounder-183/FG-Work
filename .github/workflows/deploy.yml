@@ -20,8 +20,8 @@ jobs:
             cd /opt/FG-Work || { echo "Project directory not found"; exit 1; }
 
             echo "=== Pulling latest code ==="
-            git checkout -- .
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "=== Installing dependencies ==="
             npm install
