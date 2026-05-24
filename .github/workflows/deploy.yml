@@ -19,17 +19,9 @@ jobs:
             set -e
             cd /opt/FG-Work || { echo "Project directory not found"; exit 1; }
 
-            echo "=== Backing up database ==="
-            cp dev.db dev.db.bak 2>/dev/null || true
-
-            echo "=== Stashing local changes ==="
-            git stash 2>/dev/null || true
-
             echo "=== Pulling latest code ==="
+            git reset --hard HEAD
             git pull origin main
-
-            echo "=== Restoring stashed files (database, env) ==="
-            git stash pop 2>/dev/null || true
 
             echo "=== Installing dependencies ==="
             npm install
