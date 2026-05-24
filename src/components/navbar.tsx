@@ -33,6 +33,7 @@ export function Navbar() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [elapsed, setElapsed] = useState(0);
+  const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -117,6 +118,28 @@ export function Navbar() {
               </Link>
             ))}
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden rounded-md p-1.5 hover:bg-accent"
+            onClick={() => setMobileMenu(!mobileMenu)}
+          >
+            <span className="text-lg">{mobileMenu ? "✕" : "☰"}</span>
+          </button>
+          {mobileMenu && (
+            <div className="absolute left-0 right-0 top-14 z-50 border-b bg-background p-2 md:hidden">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenu(false)}
+                  className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Timer */}

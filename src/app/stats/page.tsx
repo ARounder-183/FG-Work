@@ -147,8 +147,8 @@ export default function StatsPage() {
                   style={{ backgroundColor: sec > 0 ? `oklch(0.55 0.2 264 / ${intensity})` : "transparent" }}
                   title={sec > 0 ? `${dateStr}: ${formatHMS(sec)}` : dateStr}
                 >
-                  <span className={isToday ? "font-bold" : ""}>{day}</span>
-                  {sec > 0 && <span className="text-[8px] leading-none mt-0.5">{formatHMS(sec)}</span>}
+              <span className={isToday ? "font-bold text-[10px] sm:text-xs" : "text-[10px] sm:text-xs"}>{day}</span>
+              {sec > 0 && <span className="text-[6px] sm:text-[8px] leading-none mt-0.5 hidden sm:inline">{formatHMS(sec)}</span>}
                 </div>
               );
             })}

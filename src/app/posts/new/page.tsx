@@ -119,7 +119,7 @@ export default function NewPostPage() {
       </div>
 
       {/* Side-by-side editor + preview */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div>
           <div className="mb-1 text-xs font-medium text-muted-foreground">编辑</div>
           <Textarea

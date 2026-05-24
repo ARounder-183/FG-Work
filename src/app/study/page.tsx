@@ -211,7 +211,7 @@ export default function StudyPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="font-mono text-5xl font-bold tracking-wider tabular-nums">
+            <div className="font-mono text-3xl sm:text-5xl font-bold tracking-wider tabular-nums">
               {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
             </div>
             <p className="text-sm text-muted-foreground">
