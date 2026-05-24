@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ========== 用户模块 ==========
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  avatar    String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  checkIns      CheckIn[]
+  studyRecords  StudyRecord[]
+  musicPlaylists MusicPlaylist[]
+  userSongs      UserSong[]
+  skipVotes      SkipVote[]
+  chatMessages   ChatMessage[]
+}
+
+// ========== 发帖模块 ==========
+model Post {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  images    String   @default("[]") // JSON array of image paths
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments Comment[]
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// ========== 打卡与计时模块 ==========
+model StudyTopic {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  icon      String?
+  createdAt DateTime  @default(now())
+
+  checkIns     CheckIn[]
+  studyRecords StudyRecord[]
+}
+
+model CheckIn {
+  id        String    @id @default(uuid())
+  userId    String
+  topicId   String
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  duration  Int?      // seconds, set when ended
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic StudyTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model StudyRecord {
+  id        String   @id @default(uuid())
+  userId    String
+  topicId   String
+  duration  Int      // seconds
+  date      DateTime // the date of this record summary (YYYY-MM-DD)
+  createdAt DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic StudyTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+// ========== 一起听歌模块 ==========
+model MusicPlaylist {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String
+  songs     String   @default("[]") // JSON array of NetEase song data
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Global music state (singleton)
+model MusicState {
+  id                String   @id
+  currentSong       String?  // JSON
+  currentUserSongId String?  // FK-like id of UserSong being played
+  isPlaying         Boolean  @default(false)
+  position          Int      @default(0)
+  currentRound      Int      @default(1)
+  queueOrder        String   @default("[]") // active userIds in order
+  updatedAt         DateTime @updatedAt
+}
+
+// Per-user song queue
+model UserSong {
+  id        String   @id @default(uuid())
+  songData  String   // JSON
+  userId    String
+  sortOrder Int      @default(0)
+  played    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Skip votes (tied to current playing song)
+model SkipVote {
+  id        String   @id @default(uuid())
+  userId    String
+  songId    String   // id of the UserSong being skipped
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+}
+
+// ========== 聊天模块 ==========
+model ChatMessage {
+  id        String   @id @default(uuid())
+  content   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
