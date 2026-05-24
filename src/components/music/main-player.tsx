@@ -9,7 +9,7 @@ interface Song { id: number; name: string; artists: string; album: string; durat
 interface ActiveUser { id: string; username: string; avatar: string | null; }
 interface Props {
   currentSong: Song | null; isPlaying: boolean; isCurrentUserSong: boolean; serverPosition: number;
-  onSkipVote: () => void; skipVotes: number; skipThreshold: number;
+  onSkipVote: () => void; onForceSkip: () => void; skipVotes: number; skipThreshold: number;
   activeUsers: ActiveUser[]; currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
   onReportPosition?: (pos: number) => void;
@@ -43,7 +43,7 @@ function getAudio(): HTMLAudioElement {
   return singletonAudio;
 }
 
-export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy, onReportPosition }: Props) {
+export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy, onReportPosition }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -201,6 +201,9 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
 
           <div className="flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={onSkipVote} className="text-xs">⏭ 切歌 ({skipVotes}/{skipThreshold})</Button>
+            {isCurrentUserSong && (
+              <Button variant="ghost" size="sm" onClick={onForceSkip} className="text-xs text-destructive">跳过</Button>
+            )}
             <div className="flex items-center gap-1">
               <span className="text-xs">🔊</span>
               <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=>setVolume(Number(e.target.value))} className="h-1 w-16 cursor-pointer accent-primary" />

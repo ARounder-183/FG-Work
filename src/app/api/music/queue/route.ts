@@ -76,6 +76,15 @@ export async function DELETE(req: NextRequest) {
     } else if (id) {
       await prisma.userSong.deleteMany({ where: { id, userId: user.id } });
     }
+
+    // If no unplayed songs left, clear playback
+    const remaining = await prisma.userSong.count({ where: { played: false } });
+    if (remaining === 0) {
+      await prisma.musicState.update({
+        where: { id: "singleton" },
+        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
+      });
+    }
     return Response.json({ success: true });
   } catch (err) {
     if (err instanceof Response) return err;

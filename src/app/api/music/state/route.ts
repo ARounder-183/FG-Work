@@ -41,6 +41,20 @@ export async function GET() {
     }
   }
 
+  // If playing but currentUserSongId is missing, repair it
+  if (state.currentSong && !state.currentUserSongId) {
+    const current = await prisma.userSong.findFirst({
+      where: { played: false },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (current) {
+      state = await prisma.musicState.update({
+        where: { id: "singleton" },
+        data: { currentUserSongId: current.id },
+      });
+    }
+  }
+
   const users = await prisma.user.findMany({
     where: { id: { in: queueOrder } },
     select: { id: true, username: true, avatar: true },
@@ -98,18 +112,26 @@ export async function PUT(req: NextRequest) {
     if (isPlaying !== undefined) updateData.isPlaying = isPlaying;
     if (position !== undefined) updateData.position = position;
 
-    if (nextSong && state.currentSong && state.currentUserSongId) {
-      // Only advance if the current song hasn't changed since we read it
-      const stillCurrent = await prisma.userSong.findFirst({
-        where: { id: state.currentUserSongId, played: false },
-      });
-      if (!stillCurrent) {
-        // Already advanced by another request, just return current state
-        return Response.json({ success: true, alreadyAdvanced: true });
+    if (nextSong && state.currentSong) {
+      // Find the current song ID if not already set
+      let songId = state.currentUserSongId;
+      if (!songId) {
+        const current = await prisma.userSong.findFirst({
+          where: { played: false },
+          orderBy: { sortOrder: "asc" },
+        });
+        if (current) songId = current.id;
       }
 
-      await prisma.userSong.update({ where: { id: state.currentUserSongId }, data: { played: true } });
-      await prisma.skipVote.deleteMany({ where: { songId: state.currentUserSongId } });
+      if (songId) {
+        const stillCurrent = await prisma.userSong.findFirst({
+          where: { id: songId, played: false },
+        });
+        if (stillCurrent) {
+          await prisma.userSong.update({ where: { id: songId }, data: { played: true } });
+          await prisma.skipVote.deleteMany({ where: { songId } });
+        }
+      }
 
       const next = await prisma.userSong.findFirst({
         where: { played: false },

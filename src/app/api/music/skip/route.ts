@@ -1,7 +1,8 @@
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
     const state = await prisma.musicState.findUnique({ where: { id: "singleton" } });
@@ -11,6 +12,19 @@ export async function POST() {
     if (!queueOrder.includes(user.id)) return Response.json({ error: "请先加入音乐室" }, { status: 400 });
 
     const songId = state.currentUserSongId;
+    const { searchParams } = new URL(req.url);
+    const force = searchParams.get("force") === "true";
+
+    // Force skip: only song owner can do this
+    if (force) {
+      const song = await prisma.userSong.findUnique({ where: { id: songId } });
+      if (!song || song.userId !== user.id) return Response.json({ error: "只有点歌人可以跳过" }, { status: 403 });
+
+      await prisma.userSong.update({ where: { id: songId }, data: { played: true } });
+      await prisma.skipVote.deleteMany({ where: { songId } });
+      await advanceToNextSong();
+      return Response.json({ skipped: true, force: true });
+    }
 
     // Toggle vote
     const existing = await prisma.skipVote.findUnique({

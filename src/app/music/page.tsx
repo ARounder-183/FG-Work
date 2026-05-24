@@ -79,6 +79,7 @@ export default function MusicPage() {
     join: async () => { await fetch(apiUrl("/api/music/join"), { method: "POST" }); setJoined(true); fetchState(); toast.success("已加入"); },
     leave: async () => { await fetch(apiUrl("/api/music/leave"), { method: "POST" }); setJoined(false); setCurrentSong(null); setIsPlaying(false); fetchState(); },
     skipVote: async () => { const r = await fetch(apiUrl("/api/music/skip"), { method: "POST" }); const d = await r.json(); toast(d.skipped ? "已跳过" : `投票 (${d.voteCount}/${d.threshold})`); fetchState(); fetchMySongs(); },
+    forceSkip: async () => { const r = await fetch(apiUrl("/api/music/skip?force=true"), { method: "POST" }); const d = await r.json(); if (d.skipped) { toast.success("已跳过"); fetchState(); fetchMySongs(); } else toast.error(d.error); },
     addSong: async (s: Song) => { const r = await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ song: s }) }); if (r.ok) { toast.success("已添加"); fetchMySongs(); fetchState(); } },
     addSongs: async (songs: Song[]) => { await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs }) }); toast.success(`已添加 ${songs.length} 首`); fetchMySongs(); fetchState(); },
     reorder: async (s: { id: string; sortOrder: number }[]) => { await fetch(apiUrl("/api/music/queue"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs: s }) }); fetchMySongs(); },
@@ -109,6 +110,7 @@ export default function MusicPage() {
             isCurrentUserSong={currentUserSong?.userId === user?.id}
             serverPosition={serverPosition}
             onSkipVote={api.skipVote}
+            onForceSkip={api.forceSkip}
             skipVotes={skipVotes.length}
             skipThreshold={skipThreshold}
             activeUsers={activeUsers}

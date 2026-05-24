@@ -90,28 +90,29 @@ function mapSongs(raw: NcmSongRaw[]): Song[] {
 }
 
 export async function searchSongs(keywords: string, limit = 50): Promise<Song[]> {
-  const data = await ncm<NcmSearchResult>("/search", { keywords, limit, type: 1 });
-  if (data?.result?.songs) return mapSongs(data.result.songs);
-  return [];
+  const data = await ncm<{ result?: { songs?: NcmSongRaw[] }; body?: { result?: { songs?: NcmSongRaw[] } } }>("/search", { keywords, limit, type: 1 });
+  // Try both response formats: {result:{songs:[]}} and {body:{result:{songs:[]}}}
+  const raw = data?.result?.songs || data?.body?.result?.songs || [];
+  return mapSongs(raw);
 }
 
 export async function searchPlaylists(keywords: string, limit = 30) {
-  const data = await ncm<NcmPlaylistSearchResult>("/search", { keywords, limit, type: 1000 });
-  return data?.result?.playlists || [];
+  const data = await ncm<{ result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number }> }; body?: { result?: { playlists?: Array<{ id: number; name: string; coverImgUrl?: string; trackCount?: number }> } } }>("/search", { keywords, limit, type: 1000 });
+  return data?.result?.playlists || data?.body?.result?.playlists || [];
 }
 
 export async function getPlaylistDetail(id: string | number) {
-  const data = await ncm<NcmPlaylistDetailResult>("/playlist/detail", { id: String(id) });
-  if (data?.playlist) {
-    return { name: data.playlist.name, tracks: mapSongs(data.playlist.tracks) };
-  }
+  const data = await ncm<{ playlist?: { name: string; tracks: NcmSongRaw[] }; body?: { playlist?: { name: string; tracks: NcmSongRaw[] } } }>("/playlist/detail", { id: String(id) });
+  const pl = data?.playlist || data?.body?.playlist;
+  if (pl) return { name: pl.name, tracks: mapSongs(pl.tracks) };
   return null;
 }
 
 export async function getSongUrl(id: string | number): Promise<string | null> {
   for (const level of ["lossless", "exhigh", "higher", "standard"]) {
-    const data = await ncm<NcmSongUrlResult>("/song/url/v1", { id: String(id), level });
-    if (data?.data?.[0]?.url) return data.data[0].url;
+    const data = await ncm<{ data?: Array<{ url?: string }>; body?: { data?: Array<{ url?: string }> } }>("/song/url/v1", { id: String(id), level });
+    const url = data?.data?.[0]?.url || data?.body?.data?.[0]?.url;
+    if (url) return url;
   }
   return null;
 }
