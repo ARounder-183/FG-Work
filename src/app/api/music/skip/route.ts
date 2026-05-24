@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { advanceToNextSong } from "../advance";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,14 +16,12 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const force = searchParams.get("force") === "true";
 
-    // Force skip: only song owner can do this
+    // Force skip: only song owner
     if (force) {
       const song = await prisma.userSong.findUnique({ where: { id: songId } });
       if (!song || song.userId !== user.id) return Response.json({ error: "只有点歌人可以跳过" }, { status: 403 });
 
-      await prisma.userSong.update({ where: { id: songId }, data: { played: true } });
-      await prisma.skipVote.deleteMany({ where: { songId } });
-      await advanceToNextSong();
+      await advanceToNextSong(song.userId);
       return Response.json({ skipped: true, force: true });
     }
 
@@ -41,10 +40,8 @@ export async function POST(req: NextRequest) {
 
     let skipped = false;
     if (voteCount >= threshold && queueOrder.length > 0) {
-      // Mark current as played
-      await prisma.userSong.update({ where: { id: songId }, data: { played: true } });
-      await prisma.skipVote.deleteMany({ where: { songId } });
-      await advanceToNextSong();
+      const song = await prisma.userSong.findUnique({ where: { id: songId }, select: { userId: true } });
+      await advanceToNextSong(song?.userId || null);
       skipped = true;
     }
 
@@ -52,53 +49,5 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof Response) return err;
     return Response.json({ error: "投票失败" }, { status: 500 });
-  }
-}
-
-async function advanceToNextSong() {
-  const state = await prisma.musicState.findUnique({ where: { id: "singleton" } });
-  if (!state) return;
-
-  const queueOrder: string[] = JSON.parse(state.queueOrder);
-  if (queueOrder.length === 0) {
-    await prisma.musicState.update({
-      where: { id: "singleton" },
-      data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
-    });
-    return;
-  }
-
-  // Find next unplayed song (already ordered by sortOrder globally)
-  const next = await prisma.userSong.findFirst({
-    where: { played: false },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  if (next) {
-    const song = JSON.parse(next.songData);
-    await prisma.musicState.update({
-      where: { id: "singleton" },
-      data: { currentSong: JSON.stringify(song), currentUserSongId: next.id, isPlaying: true, position: 0 },
-    });
-  } else {
-    // All songs played, advance round
-    await prisma.userSong.updateMany({ data: { played: false } });
-    await prisma.musicState.update({
-      where: { id: "singleton" },
-      data: { currentRound: state.currentRound + 1, currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
-    });
-
-    // Try again
-    const first = await prisma.userSong.findFirst({
-      where: { played: false },
-      orderBy: { sortOrder: "asc" },
-    });
-    if (first) {
-      const song = JSON.parse(first.songData);
-      await prisma.musicState.update({
-        where: { id: "singleton" },
-        data: { currentSong: JSON.stringify(song), currentUserSongId: first.id, isPlaying: true, position: 0 },
-      });
-    }
   }
 }

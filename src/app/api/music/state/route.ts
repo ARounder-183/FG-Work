@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { advanceToNextSong } from "../advance";
 
 export async function GET() {
   let state = await prisma.musicState.findUnique({ where: { id: "singleton" } });
@@ -15,7 +16,7 @@ export async function GET() {
     });
   }
 
-  // Clean up songs from users who left (one-time, after fix deployed)
+  // Clean up songs from inactive users
   if (queueOrder.length > 0) {
     await prisma.userSong.updateMany({
       where: { played: false, userId: { notIn: queueOrder } },
@@ -23,8 +24,16 @@ export async function GET() {
     });
   }
 
-  // No unplayed songs → clear
-  const unplayedCount = await prisma.userSong.count({ where: { played: false } });
+  // Auto-start if idle and has active users with songs
+  const unplayedCount = await prisma.userSong.count({
+    where: { played: false, userId: { in: queueOrder.length > 0 ? queueOrder : undefined } },
+  });
+
+  if (!state.currentSong && unplayedCount > 0 && queueOrder.length > 0) {
+    await advanceToNextSong(null);
+    state = (await prisma.musicState.findUnique({ where: { id: "singleton" } }))!;
+  }
+
   if (unplayedCount === 0 && state.currentSong) {
     state = await prisma.musicState.update({
       where: { id: "singleton" },
@@ -32,23 +41,7 @@ export async function GET() {
     });
   }
 
-  // Auto-start if idle
-  if (!state.currentSong && unplayedCount > 0 && queueOrder.length > 0) {
-    const first = await prisma.userSong.findFirst({
-      where: { played: false },
-      orderBy: { sortOrder: "asc" },
-    });
-    if (first) {
-      state = await prisma.musicState.update({
-        where: { id: "singleton" },
-        data: { currentSong: JSON.stringify(first.songData), currentUserSongId: first.id, isPlaying: true, position: 0 },
-      });
-    }
-  }
-
-  // === Single source of truth: derive everything from currentUserSongId ===
-
-  // Find the actual current song by its ID
+  // Derive current user song from state
   let currentUserSong: { id: string; userId: string; user: { username: string; avatar: string | null } } | null = null;
   if (state.currentUserSongId) {
     currentUserSong = await prisma.userSong.findUnique({
@@ -57,44 +50,27 @@ export async function GET() {
     });
   }
 
-  // If currentUserSongId points to a played/deleted song, fix it
+  // Fix stale pointer
   if (!currentUserSong && state.currentSong) {
-    const first = await prisma.userSong.findFirst({
-      where: { played: false },
-      orderBy: { sortOrder: "asc" },
-      include: { user: { select: { id: true, username: true, avatar: true } } },
-    });
-    if (first) {
-      state = await prisma.musicState.update({
-        where: { id: "singleton" },
-        data: { currentSong: first.songData, currentUserSongId: first.id, isPlaying: true, position: 0 },
-      });
-      currentUserSong = first;
-    } else {
-      state = await prisma.musicState.update({
-        where: { id: "singleton" },
-        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
+    await advanceToNextSong(null);
+    state = (await prisma.musicState.findUnique({ where: { id: "singleton" } }))!;
+    if (state.currentUserSongId) {
+      currentUserSong = await prisma.userSong.findUnique({
+        where: { id: state.currentUserSongId },
+        include: { user: { select: { id: true, username: true, avatar: true } } },
       });
     }
   }
 
   const currentSong = state.currentSong ? JSON.parse(state.currentSong) : null;
 
-  // Users sorted by their first song's sortOrder
-  const userSongs = await prisma.userSong.findMany({
-    where: { played: false },
-    orderBy: { sortOrder: "asc" },
-    select: { userId: true, sortOrder: true },
-  });
-  const userOrder = new Map<string, number>();
-  userSongs.forEach((s) => { if (!userOrder.has(s.userId)) userOrder.set(s.userId, s.sortOrder); });
-
-  const users = (await prisma.user.findMany({
+  // Users sorted by whose turn is next
+  const users = await prisma.user.findMany({
     where: { id: { in: queueOrder } },
     select: { id: true, username: true, avatar: true },
-  })).sort((a, b) => (userOrder.get(a.id) ?? 999999) - (userOrder.get(b.id) ?? 999999));
+  });
 
-  // Skip votes (tied to current song)
+  // Skip votes
   let skipVotes: string[] = [];
   if (currentUserSong) {
     const votes = await prisma.skipVote.findMany({
@@ -104,9 +80,9 @@ export async function GET() {
     skipVotes = votes.map((v) => v.userId);
   }
 
-  // Full queue
+  // Full queue (only active users, unplayed)
   const fullQueue = await prisma.userSong.findMany({
-    where: { played: false },
+    where: { played: false, userId: { in: queueOrder } },
     orderBy: { sortOrder: "asc" },
     include: { user: { select: { id: true, username: true, avatar: true } } },
   });
@@ -133,47 +109,13 @@ export async function PUT(req: NextRequest) {
     if (position !== undefined) updateData.position = position;
 
     if (nextSong && state.currentSong) {
-      // Mark current as played using the ID from state
-      if (state.currentUserSongId) {
-        await prisma.userSong.updateMany({
-          where: { id: state.currentUserSongId, played: false },
-          data: { played: true },
-        });
-        await prisma.skipVote.deleteMany({ where: { songId: state.currentUserSongId } });
-      }
-
-      const next = await prisma.userSong.findFirst({
-        where: { played: false },
-        orderBy: { sortOrder: "asc" },
-      });
-
-      if (next) {
-        updateData.currentSong = next.songData;
-        updateData.currentUserSongId = next.id;
-        updateData.isPlaying = true;
-        updateData.position = 0;
-      } else {
-        // Reset round
-        await prisma.userSong.updateMany({ data: { played: false } });
-        const first = await prisma.userSong.findFirst({
-          where: { played: false },
-          orderBy: { sortOrder: "asc" },
-        });
-        if (first) {
-          updateData.currentSong = first.songData;
-          updateData.currentUserSongId = first.id;
-          updateData.isPlaying = true;
-          updateData.position = 0;
-        } else {
-          updateData.currentSong = null;
-          updateData.currentUserSongId = null;
-          updateData.isPlaying = false;
-          updateData.position = 0;
-        }
-      }
+      await advanceToNextSong(state.currentUserSongId
+        ? (await prisma.userSong.findUnique({ where: { id: state.currentUserSongId }, select: { userId: true } }))?.userId || null
+        : null);
+    } else {
+      await prisma.musicState.update({ where: { id: "singleton" }, data: updateData });
     }
 
-    await prisma.musicState.update({ where: { id: "singleton" }, data: updateData });
     return Response.json({ success: true });
   } catch {
     return Response.json({ error: "更新失败" }, { status: 500 });

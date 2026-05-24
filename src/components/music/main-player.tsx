@@ -97,7 +97,6 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     singletonLastId = currentSong.id;
 
     setCoverUrl(null);
-    setLyric(null);
     fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
 
     // Fetch song URL with retries
@@ -120,6 +119,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       });
     };
     tryFetchUrl();
+  }, [currentSong?.id]);
+
+  // Fetch lyric separately (always, not deduped)
+  useEffect(() => {
+    if (!currentSong) { setLyric(null); return; }
+    setLyric(null);
+    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
   }, [currentSong?.id]);
 
   // Play/pause sync
