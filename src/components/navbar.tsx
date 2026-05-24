@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/components/auth-provider";
 import { useStudy } from "@/components/study-provider";
 import { useMusic } from "@/components/music-provider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Sun, Moon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,8 +30,48 @@ export function Navbar() {
   const { user, loading, logout } = useAuth();
   const { active } = useStudy();
   const { currentSong, isPlaying } = useMusic();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [elapsed, setElapsed] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const toggleTheme = (e: React.MouseEvent) => {
+    const x = e.clientX;
+    const y = e.clientY;
+    const isDark = theme === "dark";
+
+    if (!document.startViewTransition) {
+      setTheme(isDark ? "light" : "dark");
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.dataset.themeVt = "1";
+    style.textContent = `
+      ::view-transition-old(root) {
+        animation: none;
+        z-index: 1;
+      }
+      ::view-transition-new(root) {
+        animation: theme-circle-open 1.5s cubic-bezier(0.22, 0.6, 0.25, 1) forwards;
+        clip-path: circle(0 at ${x}px ${y}px);
+        z-index: 9999;
+      }
+      @keyframes theme-circle-open {
+        to {
+          clip-path: circle(150vmax at ${x}px ${y}px);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    document.startViewTransition(() => {
+      setTheme(isDark ? "light" : "dark");
+    });
+
+    setTimeout(() => style.remove(), 1600);
+  };
 
   useEffect(() => {
     if (active) {
@@ -94,6 +136,21 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
+          {mounted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "切换为白天模式" : "切换为黑夜模式"}
+              aria-label="切换主题"
+            >
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+            </Button>
+          )}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent">

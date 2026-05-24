@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/components/auth-provider";
 import { StudyProvider } from "@/components/study-provider";
 import { MusicProvider } from "@/components/music-provider";
@@ -31,17 +32,20 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <MusicProvider>
-          <StudyProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Toaster richColors />
-          </StudyProvider>
-          </MusicProvider>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AuthProvider>
+            <MusicProvider>
+            <StudyProvider>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Toaster richColors />
+            </StudyProvider>
+            </MusicProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
