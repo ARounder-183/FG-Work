@@ -84,6 +84,17 @@ export default function StudyPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [active]);
 
+  // Periodic report every 30s (crash protection)
+  useEffect(() => {
+    if (!active) return;
+    const report = () => {
+      fetch(apiUrl("/api/checkin/report"), { method: "POST" }).catch(() => {});
+    };
+    report(); // report immediately on start
+    const interval = setInterval(report, 30000);
+    return () => clearInterval(interval);
+  }, [active]);
+
   // Auto-stop on tab close / disconnect
   useEffect(() => {
     const stopIfActive = () => {
