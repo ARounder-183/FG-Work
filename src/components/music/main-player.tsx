@@ -24,9 +24,13 @@ let singletonLastId: number | null = null;
 let singletonReportTimer: ReturnType<typeof setInterval> | null = null;
 let lastAutoSkip = 0;
 
+// Module-level ref for current-user flag
+let isCurrentUserRef = false;
+
 function autoSkip() {
+  if (!isCurrentUserRef) return; // Only the song owner can trigger auto-skip
   const now = Date.now();
-  if (now - lastAutoSkip < 3000) return; // 3s cooldown
+  if (now - lastAutoSkip < 8000) return; // 8s cooldown
   lastAutoSkip = now;
   window.dispatchEvent(new CustomEvent("music-ended"));
 }
@@ -45,13 +49,19 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const reportRef = useRef(onReportPosition);
   reportRef.current = onReportPosition;
+  isCurrentUserRef = isCurrentUserSong;
 
   // Setup audio listeners
   useEffect(() => {
     const a = getAudio();
     const onTime = () => setPosition(a.currentTime);
     const onEnd = () => window.dispatchEvent(new CustomEvent("music-ended"));
-    const onError = () => autoSkip();
+    const onError = () => {
+      // Client-side error - retry playing, don't skip
+      setTimeout(() => {
+        if (a.src && a.paused) a.play().catch(() => {});
+      }, 2000);
+    };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("ended", onEnd);
     a.addEventListener("error", onError);
