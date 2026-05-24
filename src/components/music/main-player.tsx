@@ -105,7 +105,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
       fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
         if(d.url && singletonAudio){
-          singletonAudio.src = d.url;
+          singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
           singletonAudio.currentTime = 0;
           if (isPlaying) singletonAudio.play().catch(()=>{});
         } else {

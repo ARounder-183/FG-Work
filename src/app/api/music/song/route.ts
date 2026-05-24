@@ -6,7 +6,8 @@ export async function GET(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return Response.json({ error: "请输入歌曲 ID" }, { status: 400 });
 
-  const url = await getSongUrl(id);
+  const rawUrl = await getSongUrl(id);
+  const url = rawUrl ? rawUrl.replace(/^http:/, "https:") : null;
   if (!url) {
     console.log(`[NCM] No URL found for song ${id}`);
   }
