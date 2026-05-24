@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
         where: { id: "singleton" },
         data: { queueOrder: JSON.stringify(queueOrder) },
       });
+
+      // Reactivate user's songs in the queue
+      await prisma.userSong.updateMany({
+        where: { userId: user.id, played: true },
+        data: { played: false },
+      });
     }
 
     return Response.json({ success: true });
