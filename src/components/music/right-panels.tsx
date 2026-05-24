@@ -21,11 +21,12 @@ interface Props {
   onReorder: (s: {id:string;sortOrder:number}[]) => void;
   onClear: () => void;
   onRandomize: () => void;
+  onDelete: (id: string) => void;
   onAddSong: (s:Song) => void;
   onAddSongs: (s:Song[]) => void;
 }
 
-export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onAddSong, onAddSongs }: Props) {
+export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs }: Props) {
   const [searchOpen, setSearchOpen] = useState(true);
   const [myOpen, setMyOpen] = useState(true);
   const [tab, setTab] = useState("song");
@@ -158,6 +159,7 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                   </div>
                   <div className="min-w-0 flex-1"><div className={`truncate ${isCur?"font-medium text-primary":""}`}>{s.name}</div></div>
                   <span className="shrink-0 tabular-nums text-muted-foreground">{fmt(s.duration)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="ml-0.5 text-muted-foreground hover:text-destructive text-[10px]">✕</button>
                 </div>
               );
             })}

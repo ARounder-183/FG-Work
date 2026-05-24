@@ -69,9 +69,12 @@ export async function DELETE(req: NextRequest) {
     const user = await requireAuth();
     const { searchParams } = new URL(req.url);
     const all = searchParams.get("all");
+    const id = searchParams.get("id");
 
     if (all === "true") {
       await prisma.userSong.deleteMany({ where: { userId: user.id } });
+    } else if (id) {
+      await prisma.userSong.deleteMany({ where: { id, userId: user.id } });
     }
     return Response.json({ success: true });
   } catch (err) {

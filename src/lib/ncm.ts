@@ -64,7 +64,9 @@ async function ncm<T>(path: string, params: Record<string, string | number> = {}
   try {
     const url = new URL(path, NCM_URL);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
-    if (NCM_COOKIE) url.searchParams.set("cookie", NCM_COOKIE);
+    if (NCM_COOKIE) {
+      url.search += (url.search ? "&" : "?") + "cookie=" + NCM_COOKIE;
+    }
     const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
     if (res.ok) return (await res.json()) as T;
     return null;
@@ -107,10 +109,14 @@ export async function getPlaylistDetail(id: string | number) {
 }
 
 export async function getSongUrl(id: string | number): Promise<string | null> {
-  // Try multiple quality levels
   for (const level of ["lossless", "exhigh", "higher", "standard"]) {
     const data = await ncm<NcmSongUrlResult>("/song/url/v1", { id: String(id), level });
     if (data?.data?.[0]?.url) return data.data[0].url;
   }
   return null;
+}
+
+export async function getLyric(id: string | number): Promise<string | null> {
+  const data = await ncm<{ lrc?: { lyric?: string } }>("/lyric", { id: String(id) });
+  return data?.lrc?.lyric || null;
 }

@@ -84,6 +84,7 @@ export default function MusicPage() {
     reorder: async (s: { id: string; sortOrder: number }[]) => { await fetch(apiUrl("/api/music/queue"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs: s }) }); fetchMySongs(); },
     clear: async () => { await fetch(apiUrl("/api/music/queue?all=true"), { method: "DELETE" }); fetchMySongs(); toast.success("已清空"); },
     randomize: async () => { const arr = [...mySongs].map((_, i) => ({ id: mySongs[i].id, sortOrder: i })).sort(() => Math.random() - 0.5); await api.reorder(arr.map((x, i) => ({ id: x.id, sortOrder: i }))); toast.success("已随机"); },
+    deleteSong: async (id: string) => { await fetch(apiUrl(`/api/music/queue?id=${id}`), { method: "DELETE" }); fetchMySongs(); toast.success("已删除"); },
     reportPosition: async (pos: number) => {
       await fetch(apiUrl("/api/music/state"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: pos }) });
     },
@@ -157,6 +158,7 @@ export default function MusicPage() {
         onReorder={api.reorder}
         onClear={api.clear}
         onRandomize={api.randomize}
+        onDelete={api.deleteSong}
         onAddSong={api.addSong}
         onAddSongs={api.addSongs}
       />

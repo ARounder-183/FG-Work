@@ -47,6 +47,8 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [lyric, setLyric] = useState<string | null>(null);
+  const [currentLine, setCurrentLine] = useState("");
   const reportRef = useRef(onReportPosition);
   reportRef.current = onReportPosition;
   isCurrentUserRef = isCurrentUserSong;
@@ -84,7 +86,9 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     singletonLastId = currentSong.id;
 
     setCoverUrl(null);
+    setLyric(null);
     fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
+    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
     fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
       if(d.url && singletonAudio){
         singletonAudio.src = d.url;
@@ -102,6 +106,28 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     if (isPlaying && a.paused) a.play().catch(()=>{});
     else if (!isPlaying && !a.paused) a.pause();
   }, [isPlaying]);
+
+  // Parse LRC and track current line
+  useEffect(() => {
+    if (!lyric) { setCurrentLine(""); return; }
+    const lines = lyric.split("\n").map((l) => {
+      const m = l.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+      if (!m) return null;
+      return { time: parseInt(m[1]) * 60 + parseFloat(m[2]), text: m[3].trim() };
+    }).filter(Boolean) as { time: number; text: string }[];
+
+    if (lines.length === 0) { setCurrentLine(""); return; }
+
+    const a = getAudio();
+    const update = () => {
+      const t = a.currentTime;
+      const line = lines.reduce((prev, curr) => (curr.time <= t ? curr : prev), lines[0]);
+      setCurrentLine(line.text || "");
+    };
+    update();
+    a.addEventListener("timeupdate", update);
+    return () => a.removeEventListener("timeupdate", update);
+  }, [lyric]);
 
   // Progress sync
   useEffect(() => {
@@ -165,6 +191,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
               <span>{fmt(position)}</span><span>{fmtTotal(dur)}</span>
             </div>
           </div>
+
+          {/* Lyrics */}
+          {currentLine && (
+            <div className="rounded-lg bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground italic">
+              {currentLine}
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={onSkipVote} className="text-xs">⏭ 切歌 ({skipVotes}/{skipThreshold})</Button>
