@@ -34,13 +34,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="h-full flex flex-col overflow-hidden">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <MusicProvider>
             <StudyProvider>
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 overflow-y-auto">{children}</main>
               <Toaster richColors />
             </StudyProvider>
             </MusicProvider>
