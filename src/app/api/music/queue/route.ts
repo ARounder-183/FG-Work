@@ -24,25 +24,19 @@ export async function POST(req: NextRequest) {
     const toAdd = songList || (song ? [song] : []);
     if (toAdd.length === 0) return Response.json({ error: "请选择歌曲" }, { status: 400 });
 
-    // Round-robin ordering: interleave songs by user
-    const state = await prisma.musicState.findUnique({ where: { id: "singleton" } });
-    const queueOrder: string[] = state ? JSON.parse(state.queueOrder) : [];
-    const userPos = queueOrder.indexOf(user.id);
-    const totalUsers = queueOrder.length || 1;
-
-    // Count how many unplayed songs this user already has
-    const userCount = await prisma.userSong.count({
-      where: { userId: user.id, played: false },
+    // Simple chronological order: new songs go to the end
+    const maxOrder = await prisma.userSong.findFirst({
+      orderBy: { sortOrder: "desc" },
+      select: { sortOrder: true },
     });
-
-    let baseOrder = userCount * totalUsers + (userPos >= 0 ? userPos : totalUsers);
+    let nextOrder = (maxOrder?.sortOrder ?? -1) + 1;
 
     for (const s of toAdd) {
       await prisma.userSong.create({
         data: {
           songData: JSON.stringify(s),
           userId: user.id,
-          sortOrder: baseOrder++,
+          sortOrder: nextOrder++,
         },
       });
     }

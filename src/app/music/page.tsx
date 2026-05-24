@@ -128,22 +128,30 @@ export default function MusicPage() {
           </button>
           {queueOpen && (
             <div className="max-h-48 overflow-y-auto divide-y rounded-b-lg border border-t-0 bg-card">
-              {fullQueue.length === 0 ? (
-                <p className="p-3 text-center text-xs text-muted-foreground">队列为空</p>
-              ) : fullQueue.map((item, i) => {
-                const s = JSON.parse(item.songData) as Song;
-                const isCur = currentSong && s.id === currentSong.id;
-                return (
-                  <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${isCur ? "bg-primary/10" : ""}`}>
-                    <span className="w-5 text-center tabular-nums text-muted-foreground">{i + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className={`truncate ${isCur ? "font-medium text-primary" : ""}`}>{s.name}</div>
-                      <div className="truncate text-muted-foreground/70">{s.artists}</div>
+              {(() => {
+                // Group by user, show only first song per user
+                const seen = new Set<string>();
+                const nextSongs = fullQueue.filter((item) => {
+                  if (seen.has(item.userId)) return false;
+                  seen.add(item.userId);
+                  return true;
+                });
+                if (nextSongs.length === 0) return <p className="p-3 text-center text-xs text-muted-foreground">队列为空</p>;
+                return nextSongs.map((item, i) => {
+                  const s = JSON.parse(item.songData) as Song;
+                  const isCur = currentSong && s.id === currentSong.id;
+                  return (
+                    <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${isCur ? "bg-primary/10" : ""}`}>
+                      <span className="w-5 text-center tabular-nums text-muted-foreground">{i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className={`truncate ${isCur ? "font-medium text-primary" : ""}`}>{s.name}</div>
+                        <div className="truncate text-muted-foreground/70">{s.artists}</div>
+                      </div>
+                      <span className="shrink-0 text-muted-foreground">{item.user.username}</span>
                     </div>
-                    <span className="shrink-0 text-muted-foreground">{item.user.username}</span>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
