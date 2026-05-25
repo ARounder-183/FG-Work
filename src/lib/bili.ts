@@ -14,6 +14,10 @@ const PASSPORT_HOST = "https://passport.bilibili.com";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+// B站 passport API 对移动端 UA 更友好（BBPlayer 验证过）
+const PASSPORT_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 BiliApp/6.66.0";
+
 // WBI mixin key shuffle table (fixed, from bilibili-API-collect)
 const MIXIN_ENC_TAB = [
   46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33,
@@ -426,7 +430,12 @@ export async function generateQRCode(): Promise<{
 }> {
   const res = await fetch(
     `${PASSPORT_HOST}/x/passport-login/web/qrcode/generate`,
-    { headers: { "User-Agent": UA } },
+    {
+      headers: {
+        "User-Agent": PASSPORT_UA,
+        Referer: "https://www.bilibili.com/",
+      },
+    },
   );
   const json = (await res.json()) as {
     code: number;
@@ -452,8 +461,10 @@ export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
   url.searchParams.set("qrcode_key", qrcodeKey);
 
   const res = await fetch(url.toString(), {
-    headers: { "User-Agent": UA },
-    redirect: "manual",
+    headers: {
+      "User-Agent": PASSPORT_UA,
+      Referer: "https://www.bilibili.com/",
+    },
   });
   const json = (await res.json()) as {
     code: number;
