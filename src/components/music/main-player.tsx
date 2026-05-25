@@ -12,8 +12,6 @@ interface Props {
   onSkipVote: () => void; onForceSkip: () => void; skipVotes: number; skipThreshold: number;
   activeUsers: ActiveUser[]; currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
-  /** Pre-cached audio URL from server (B站) — avoids client re-fetching from B站 API */
-  currentAudioUrl?: string | null;
 }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
@@ -31,7 +29,7 @@ function getAudio(): HTMLAudioElement {
   return singletonAudio;
 }
 
-export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy, currentAudioUrl }: Props) {
+export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(() => {
     if (typeof window !== "undefined") {
@@ -142,20 +140,15 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
 
     // ── Audio URL ──────────────────────────────────────────────────────
     if (isBili) {
-      // B站: prefer server-cached URL (injected via prop from state poll), fall back to API fetch
-      if (currentAudioUrl && currentAudioUrl.length > 0) {
-        loadBiliAudio(a, currentAudioUrl);
-      } else {
-        // No cached URL — fetch from server (server may not have validated yet)
-        const params = new URLSearchParams();
-        params.set("source", "bilibili");
-        params.set("bvid", currentSong.bvid || "");
-        params.set("cid", String(currentSong.cid ?? ""));
-        fetch(apiUrl(`/api/music/song?${params.toString()}`))
-          .then((r) => r.json())
-          .then((d) => { if (d.url && singletonAudio) loadBiliAudio(singletonAudio, d.url as string); })
-          .catch(() => {});
-      }
+      // Each client calls B站 API independently — B站 CDN URLs are per-session
+      const params = new URLSearchParams();
+      params.set("source", "bilibili");
+      params.set("bvid", currentSong.bvid || "");
+      params.set("cid", String(currentSong.cid ?? ""));
+      fetch(apiUrl(`/api/music/song?${params.toString()}`))
+        .then((r) => r.json())
+        .then((d) => { if (d.url && singletonAudio) loadBiliAudio(singletonAudio, d.url as string); })
+        .catch(() => {});
     } else {
       // NCM: direct URL — no proxy needed
       const params = new URLSearchParams();
@@ -171,7 +164,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
         })
         .catch(() => {});
     }
-  }, [currentSong?.id, currentSong?.bvid, currentAudioUrl]);
+  }, [currentSong?.id, currentSong?.bvid]);
 
   /** Load B站 audio: direct CDN access (no proxy) */
   function loadBiliAudio(a: HTMLAudioElement, rawUrl: string) {

@@ -157,7 +157,6 @@ export async function GET() {
       skipThreshold: Math.ceil(queueOrder.length / 2),
       currentUserSong,
       fullQueue,
-      currentAudioUrl: state.currentAudioUrl || null,
     });
   } catch (error) {
     console.error("[Music State GET]", error);

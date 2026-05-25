@@ -122,7 +122,6 @@ model MusicState {
   queueOrder        String    @default("[]") // active userIds in order
   startedAt         DateTime? // when the current song started playing (wall clock)
   lastAdvanceAt     DateTime? // last time advanceToNextSong was called (debounce)
-  currentAudioUrl   String?   // cached audio URL (B站) to avoid client re-fetch from B站 API
   updatedAt         DateTime  @updatedAt
 }
 
