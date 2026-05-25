@@ -497,6 +497,7 @@ export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
 export interface PhoneCaptchaData {
   token: string;
   geetest: { gt: string; challenge: string };
+  tencent: { appid: string };
 }
 
 /** 获取手机号登录的图形验证 token */
@@ -513,10 +514,18 @@ export async function getPhoneCaptcha(): Promise<PhoneCaptchaData | null> {
     );
     const json = (await res.json()) as {
       code: number;
-      data?: { token: string; geetest: { gt: string; challenge: string } };
+      data?: {
+        token: string;
+        geetest: { gt: string; challenge: string };
+        tencent: { appid: string };
+      };
     };
     if (json.code !== 0 || !json.data) return null;
-    return { token: json.data.token, geetest: json.data.geetest };
+    return {
+      token: json.data.token,
+      geetest: json.data.geetest,
+      tencent: json.data.tencent,
+    };
   } catch {
     return null;
   }
