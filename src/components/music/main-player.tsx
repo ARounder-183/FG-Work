@@ -1,11 +1,11 @@
 "use client";
 
-import { apiUrl } from "@/lib/url";
+import { apiUrl, proxyImage } from "@/lib/url";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
-interface Song { id: number; name: string; artists: string; album: string; duration: number; picUrl?: string; }
+interface Song { id: number | string; name: string; artists: string; album: string; duration: number; picUrl?: string; source?: "ncm" | "bilibili"; bvid?: string; cid?: number; }
 interface ActiveUser { id: string; username: string; avatar: string | null; }
 interface Props {
   currentSong: Song | null; isPlaying: boolean; isCurrentUserSong: boolean; serverPosition: number;
@@ -19,7 +19,7 @@ function fmtTotal(s: number) { if (s<=0) return "--:--"; return fmt(s); }
 
 // Module-level singletons — survive component unmount/remount
 let singletonAudio: HTMLAudioElement | null = null;
-let singletonLastId: number | null = null;
+let singletonLastId: number | string | null = null;
 
 function getAudio(): HTMLAudioElement {
   if (!singletonAudio) {
@@ -80,40 +80,73 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   useEffect(() => {
     const a = getAudio();
     if (!currentSong) { a.pause(); a.src = ""; singletonLastId = null; return; }
-    if (singletonLastId === currentSong.id) return;
-    singletonLastId = currentSong.id;
+    const songKey = currentSong.source === "bilibili" ? (currentSong.bvid ?? currentSong.id) : currentSong.id;
+    if (songKey == null || singletonLastId === songKey) return;
+    singletonLastId = songKey ?? null;
 
     setCoverUrl(null);
 
-    // Fetch cover
-    fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`))
-      .then(r => r.json())
-      .then(d => { if (d.picUrl) setCoverUrl(d.picUrl); })
-      .catch(() => {});
+    // Build query params
+    const params = new URLSearchParams();
+    const isBili = currentSong.source === "bilibili";
+    if (isBili) {
+      params.set("source", "bilibili");
+      params.set("bvid", currentSong.bvid || "");
+      params.set("cid", String(currentSong.cid ?? ""));
+    } else {
+      params.set("id", String(currentSong.id));
+    }
+
+    // Fetch cover — for Bilibili, use song data directly (already has picUrl from search)
+    if (isBili) {
+      // Bilibili cover from song data — proxy handles protocol + Referer
+      if (currentSong.picUrl) setCoverUrl(currentSong.picUrl);
+    } else {
+      // NCM: need separate API to get cover
+      const detailParams = new URLSearchParams();
+      detailParams.set("id", String(currentSong.id));
+      fetch(apiUrl(`/api/music/song/detail?${detailParams.toString()}`))
+        .then(r => r.json())
+        .then(d => { if (d.picUrl) setCoverUrl(d.picUrl); })
+        .catch(() => {});
+    }
 
     // Fetch song URL (one-shot, no retry — server validates URL at advance time)
-    fetch(apiUrl(`/api/music/song?id=${currentSong.id}`))
+    fetch(apiUrl(`/api/music/song?${params.toString()}`))
       .then(r => r.json())
       .then(d => {
         if (d.url && singletonAudio) {
-          singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
+          if (isBili) {
+            // Bilibili CDN requires Referer — proxy through our server
+            const encoded = btoa(d.url);
+            singletonAudio.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
+          } else {
+            singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
+          }
           singletonAudio.currentTime = 0;
           if (isPlaying) singletonAudio.play().catch(() => {});
         }
         // If no URL: server timer will advance. Client silently waits for next poll.
       })
       .catch(() => {});
-  }, [currentSong?.id]);
+  }, [currentSong?.id, currentSong?.bvid]);
 
   // ── Fetch lyric ────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentSong) { setLyric(null); return; }
     setLyric(null);
-    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`))
+    const isBili = currentSong.source === "bilibili";
+    const lyricParams = new URLSearchParams();
+    if (isBili) {
+      lyricParams.set("source", "bilibili");
+    } else {
+      lyricParams.set("id", String(currentSong.id));
+    }
+    fetch(apiUrl(`/api/music/lyric?${lyricParams.toString()}`))
       .then(r => r.json())
       .then(d => { if (d.lyric) setLyric(d.lyric); })
       .catch(() => {});
-  }, [currentSong?.id]);
+  }, [currentSong?.id, currentSong?.bvid]);
 
   // ── Play/pause sync ────────────────────────────────────────────────
   useEffect(() => {
@@ -180,7 +213,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
         <div className="w-full space-y-3">
           <div className="flex gap-3 rounded-xl bg-card p-4 shadow-sm">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-              {coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : <span className="text-2xl">🎵</span>}
+              {coverUrl ? <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" /> : <span className="text-2xl">🎵</span>}
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-center">
               <h2 className="truncate text-base font-bold">{currentSong.name}</h2>

@@ -20,7 +20,7 @@ export async function GET() {
     }
 
     if (queueOrder.length > 0) {
-      const staleThreshold = new Date(Date.now() - 15_000);
+      const staleThreshold = new Date(Date.now() - 60_000); // 60s grace period for background listening
       const activeUserIds = await prisma.user.findMany({
         where: { id: { in: queueOrder }, lastSeenAt: { gte: staleThreshold } },
         select: { id: true },

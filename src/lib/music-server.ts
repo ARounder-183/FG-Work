@@ -2,6 +2,16 @@
 
 import { prisma } from "./prisma";
 import { getSongUrl } from "./ncm";
+import { getAudioUrl as getBiliAudioUrl } from "./bili";
+
+// Define the unified song shape for internal parsing
+interface SongData {
+  id?: number | string;
+  source?: string;
+  bvid?: string;
+  cid?: number;
+  duration?: number;
+}
 
 // ════════════════════════════════════════════════════════════════════
 //  播放时钟（内存定时器）
@@ -123,12 +133,12 @@ async function tryPlayNextInQueue(
     });
     if (!song) continue;
 
-    const songData = safeParseJson(song.songData) as { id: number; duration: number } | null;
+    const songData = safeParseJson(song.songData) as SongData | null;
     if (!songData) {
       await markSongPlayed(song.id);
       continue;
     }
-    const urlValid = await validateSongUrl(songData.id);
+    const urlValid = await validateSongUrl(songData);
     if (!urlValid) {
       await markSongPlayed(song.id);
       continue;
@@ -144,7 +154,7 @@ async function tryPlayNextInQueue(
 
 async function setCurrentSong(
   song: { id: string; songData: string },
-  songData: { duration: number },
+  songData: SongData,
   round: number,
   nextTurnIdx: number,
 ): Promise<void> {
@@ -185,10 +195,22 @@ async function clearPlayback(): Promise<void> {
   });
 }
 
-async function validateSongUrl(songId: number): Promise<boolean> {
+async function validateSongUrl(songData: SongData): Promise<boolean> {
   try {
-    const url = await getSongUrl(String(songId));
-    return url !== null && url.length > 0;
+    const source = songData.source || "ncm";
+
+    if (source === "bilibili" && songData.bvid) {
+      // cid may be 0 (search results don't include it) — getAudioUrl auto-resolves
+      const url = await getBiliAudioUrl(songData.bvid, songData.cid ?? 0);
+      return url !== null && url.length > 0;
+    }
+
+    if (songData.id) {
+      const url = await getSongUrl(String(songData.id));
+      return url !== null && url.length > 0;
+    }
+
+    return false;
   } catch {
     return false;
   }

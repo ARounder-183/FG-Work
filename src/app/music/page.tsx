@@ -8,10 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MainPlayer } from "@/components/music/main-player";
 import { RightPanels } from "@/components/music/right-panels";
 import { ChatPanel } from "@/components/music/chat-panel";
+import { BilibiliLogin } from "@/components/bilibili-login";
 import { toast } from "sonner";
 
 interface Song {
-  id: number; name: string; artists: string; album: string; duration: number; picUrl?: string;
+  id: number | string; name: string; artists: string; album: string; duration: number; picUrl?: string;
+  source?: "ncm" | "bilibili"; bvid?: string; cid?: number;
 }
 interface MySong { id: string; songData: string; sortOrder: number; }
 interface ActiveUser { id: string; username: string; avatar: string | null; }
@@ -31,6 +33,9 @@ export default function MusicPage() {
   const [serverPosition, setServerPosition] = useState(0);
   const [loading, setLoading] = useState(true);
   const [queueOpen, setQueueOpen] = useState(true);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [biliLoggedIn, setBiliLoggedIn] = useState(false);
+  const [biliUname, setBiliUname] = useState("");
 
   const fetchMySongs = useCallback(async () => {
     if (!user) return;
@@ -62,23 +67,25 @@ export default function MusicPage() {
   useEffect(() => { fetchState(); fetchMySongs(); }, [fetchState, fetchMySongs]);
   useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 2000); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
 
-  // Auto-leave on page close / tab hidden
+  // Check Bilibili login status
+  useEffect(() => {
+    fetch(apiUrl("/api/bilibili/login/status"))
+      .then((r) => r.json())
+      .then((d) => {
+        setBiliLoggedIn(d.loggedIn || false);
+        setBiliUname(d.bilibiliUname || "");
+      })
+      .catch(() => {});
+  }, []);
+
+  // Leave room only on actual page close / refresh (not tab switch or SPA navigation).
+  // Background listening is expected — server timeout handles inactive users.
   useEffect(() => {
     const leave = () => {
       if (joined) navigator.sendBeacon(apiUrl("/api/music/leave"));
     };
-    const onVisibility = () => {
-      if (document.hidden && joined) {
-        fetch(apiUrl("/api/music/leave"), { method: "POST", keepalive: true });
-        setJoined(false);
-      }
-    };
     window.addEventListener("beforeunload", leave);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("beforeunload", leave);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
+    return () => window.removeEventListener("beforeunload", leave);
   }, [joined]);
 
   const api = {
@@ -97,6 +104,7 @@ export default function MusicPage() {
   if (loading) return <div className="mx-auto max-w-5xl px-4 py-8"><Skeleton className="h-96 w-full" /></div>;
 
   return (
+    <>
     <div className="flex min-h-0 flex-1">
       <div className="flex flex-1 flex-col min-h-0">
         <div className="flex items-center justify-center gap-3 border-b px-4 py-2">
@@ -171,7 +179,20 @@ export default function MusicPage() {
         onDelete={api.deleteSong}
         onAddSong={api.addSong}
         onAddSongs={api.addSongs}
+        biliLoggedIn={biliLoggedIn}
+        biliUname={biliUname}
+        onBiliLogin={() => setLoginOpen(true)}
       />
     </div>
+
+    <BilibiliLogin
+      open={loginOpen}
+      onClose={() => setLoginOpen(false)}
+      onLoginSuccess={(uname) => {
+        setBiliLoggedIn(true);
+        setBiliUname(uname);
+      }}
+    />
+    </>
   );
 }
