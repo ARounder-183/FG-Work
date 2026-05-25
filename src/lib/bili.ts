@@ -466,13 +466,22 @@ export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
   params.set("ts", String(Date.now()));
 
   const url = `${PASSPORT_HOST}/x/passport-login/web/qrcode/poll?${params.toString()}`;
+  console.log("[BILI QR] poll →", url);
 
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Referer: "https://www.bilibili.com/",
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        Referer: "https://www.bilibili.com/",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    console.error("[BILI QR] poll fetch error:", err);
+    return { status: "pending", code: 86101 };
+  }
+
   const text = await res.text();
   console.log("[BILI QR] poll ←", res.status, text.slice(0, 200));
 
