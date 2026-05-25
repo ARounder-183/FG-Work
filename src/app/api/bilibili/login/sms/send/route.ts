@@ -5,7 +5,7 @@ import { sendPhoneSms } from "@/lib/bili";
 export async function POST(req: NextRequest) {
   try {
     await requireAuth();
-    const { tel, cid, token, challenge, validate, seccode } = await req.json();
+    const { tel, cid, token, challenge, validate, seccode, ticket, randstr } = await req.json();
 
     if (!tel || !token) {
       return Response.json({ error: "缺少参数" }, { status: 400 });
@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
       tel,
       cid || "86",
       token,
-      challenge || "",
-      validate || "",
+      challenge || ticket || "",
+      validate || randstr || "",
       seccode || "",
     );
     if (!captchaKey) {
