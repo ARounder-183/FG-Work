@@ -111,6 +111,7 @@ model MusicState {
   isPlaying         Boolean   @default(false)
   position          Int       @default(0)
   currentRound      Int       @default(1)
+  currentTurnIndex  Int       @default(0)  // next user index in queueOrder
   queueOrder        String    @default("[]") // active userIds in order
   startedAt         DateTime? // when the current song started playing (wall clock)
   lastAdvanceAt     DateTime? // last time advanceToNextSong was called (debounce)

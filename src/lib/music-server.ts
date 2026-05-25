@@ -47,7 +47,7 @@ async function tick(): Promise<void> {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  切歌逻辑
+//  切歌逻辑（currentTurnIndex 驱动）
 // ════════════════════════════════════════════════════════════════════
 
 export async function advanceToNextSong(): Promise<void> {
@@ -62,18 +62,8 @@ export async function advanceToNextSong(): Promise<void> {
     if (msSince < ADVANCE_COOLDOWN_MS) return;
   }
 
-  // 推导当前歌曲的 userId
-  let currentUserId: string | null = null;
+  // 标记当前歌曲已播放（如果存在）
   if (state.currentUserSongId) {
-    const song = await prisma.userSong.findUnique({
-      where: { id: state.currentUserSongId },
-      select: { userId: true },
-    });
-    currentUserId = song?.userId || null;
-  }
-
-  // 标记当前歌曲已播放
-  if (currentUserId && state.currentUserSongId) {
     await prisma.userSong.updateMany({
       where: { id: state.currentUserSongId, played: false },
       data: { played: true },
@@ -83,7 +73,7 @@ export async function advanceToNextSong(): Promise<void> {
     });
   }
 
-  const queueOrder: string[] = safeParseArray(state.queueOrder);
+  const queueOrder = safeParseArray(state.queueOrder);
 
   // 无活跃用户 → 停止播放
   if (queueOrder.length === 0) {
@@ -92,73 +82,19 @@ export async function advanceToNextSong(): Promise<void> {
     return;
   }
 
-  // Round-robin：从当前用户的下一位开始找未播放的歌
-  let startIdx = currentUserId ? queueOrder.indexOf(currentUserId) : -1;
-  if (startIdx < 0) startIdx = queueOrder.length - 1;
+  // 从 currentTurnIndex 开始遍历队列，找下一个有歌的用户
+  const turnIdx = state.currentTurnIndex % queueOrder.length;
+  const played = await tryPlayNextInQueue(queueOrder, turnIdx, state.currentRound);
+  if (played) return;
 
-  for (let i = 1; i <= queueOrder.length; i++) {
-    const idx = (startIdx + i) % queueOrder.length;
-    const userId = queueOrder[idx];
-    const song = await prisma.userSong.findFirst({
-      where: { userId, played: false },
-      orderBy: { sortOrder: "asc" },
-    });
-    if (song) {
-      const songData = safeParseJson(song.songData) as { id: number; duration: number } | null;
-      if (!songData) {
-        // 数据损坏 → 标记已播放并跳过
-        await prisma.userSong.updateMany({
-          where: { id: song.id, played: false },
-          data: { played: true },
-        });
-        continue;
-      }
-      const urlValid = await validateSongUrl(songData.id);
-      if (urlValid) {
-        await setCurrentSong(song, songData, state.currentRound);
-        return;
-      }
-      // URL 不可用 → 标记已播放，继续找下一个
-      await prisma.userSong.updateMany({
-        where: { id: song.id, played: false },
-        data: { played: true },
-      });
-    }
-  }
-
-  // 所有用户的歌都播完 → 重置并开始下一轮
+  // 所有用户的歌都播完 → 重置，从 queueOrder[0] 开始新一轮
   await prisma.userSong.updateMany({
     where: { played: true, userId: { in: queueOrder } },
     data: { played: false },
   });
 
-  const firstSong = await prisma.userSong.findFirst({
-    where: { played: false, userId: { in: queueOrder } },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  if (firstSong) {
-    const songData = safeParseJson(firstSong.songData) as { id: number; duration: number } | null;
-    if (!songData) {
-      await prisma.userSong.updateMany({
-        where: { id: firstSong.id },
-        data: { played: true },
-      });
-      return advanceToNextSong();
-    }
-    const urlValid = await validateSongUrl(songData.id);
-    if (urlValid) {
-      await setCurrentSong(firstSong, songData, state.currentRound + 1);
-      return;
-    }
-    // URL 不可用 → 标记并递归
-    await prisma.userSong.updateMany({
-      where: { id: firstSong.id },
-      data: { played: true },
-    });
-    // 递归重试（最多额外尝试一次，避免无限循环）
-    return advanceToNextSong();
-  }
+  const restarted = await tryPlayNextInQueue(queueOrder, 0, state.currentRound + 1);
+  if (restarted) return;
 
   // 完全无歌可播
   await clearPlayback();
@@ -169,10 +105,48 @@ export async function advanceToNextSong(): Promise<void> {
 //  内部工具
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ * 从 startIdx 开始遍历 queueOrder，找到第一个有有效歌曲的用户，播放之。
+ * 返回 true 表示成功播放，false 表示无人有歌。
+ */
+async function tryPlayNextInQueue(
+  queueOrder: string[],
+  startIdx: number,
+  round: number,
+): Promise<boolean> {
+  for (let i = 0; i < queueOrder.length; i++) {
+    const idx = (startIdx + i) % queueOrder.length;
+    const userId = queueOrder[idx];
+    const song = await prisma.userSong.findFirst({
+      where: { userId, played: false },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (!song) continue;
+
+    const songData = safeParseJson(song.songData) as { id: number; duration: number } | null;
+    if (!songData) {
+      await markSongPlayed(song.id);
+      continue;
+    }
+    const urlValid = await validateSongUrl(songData.id);
+    if (!urlValid) {
+      await markSongPlayed(song.id);
+      continue;
+    }
+
+    // 成功 → 设置当前歌曲，轮转指针指向下一位
+    const nextTurnIdx = (idx + 1) % queueOrder.length;
+    await setCurrentSong(song, songData, round, nextTurnIdx);
+    return true;
+  }
+  return false;
+}
+
 async function setCurrentSong(
   song: { id: string; songData: string },
   songData: { duration: number },
   round: number,
+  nextTurnIdx: number,
 ): Promise<void> {
   await prisma.musicState.update({
     where: { id: "singleton" },
@@ -182,11 +156,19 @@ async function setCurrentSong(
       isPlaying: true,
       position: 0,
       currentRound: round,
+      currentTurnIndex: nextTurnIdx,
       startedAt: new Date(),
       lastAdvanceAt: new Date(),
     },
   });
   ensureTimerRunning();
+}
+
+async function markSongPlayed(songId: string): Promise<void> {
+  await prisma.userSong.updateMany({
+    where: { id: songId, played: false },
+    data: { played: true },
+  });
 }
 
 async function clearPlayback(): Promise<void> {

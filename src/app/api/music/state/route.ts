@@ -71,10 +71,13 @@ export async function GET() {
     // 服务端计算 position
     const position = await getCurrentPosition();
 
-    const users = await prisma.user.findMany({
+    // 用户列表：按队列顺序排序
+    const dbUsers = await prisma.user.findMany({
       where: { id: { in: queueOrder } },
       select: { id: true, username: true, avatar: true },
     });
+    const userMap = new Map(dbUsers.map((u) => [u.id, u]));
+    const users = queueOrder.map((id) => userMap.get(id)).filter(Boolean) as Array<{ id: string; username: string; avatar: string | null }>;
 
     let skipVotes: string[] = [];
     if (currentUserSong) {
@@ -85,10 +88,18 @@ export async function GET() {
       skipVotes = votes.map((v) => v.userId);
     }
 
-    const fullQueue = await prisma.userSong.findMany({
+    // 全局队列：先按用户在 queueOrder 中的顺序，再按歌曲 sortOrder
+    const allSongs = await prisma.userSong.findMany({
       where: { played: false, userId: { in: queueOrder } },
       orderBy: { sortOrder: "asc" },
       include: { user: { select: { id: true, username: true, avatar: true } } },
+    });
+    const userRank = new Map(queueOrder.map((id, i) => [id, i]));
+    const fullQueue = allSongs.sort((a, b) => {
+      const rankA = userRank.get(a.userId) ?? 99;
+      const rankB = userRank.get(b.userId) ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.sortOrder - b.sortOrder;
     });
 
     return Response.json({

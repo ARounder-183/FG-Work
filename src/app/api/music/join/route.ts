@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       state = await prisma.musicState.create({ data: { id: "singleton" } });
     }
 
-    const queueOrder: string[] = JSON.parse(state.queueOrder);
+    const queueOrder = safeParseArray(state.queueOrder);
     if (!queueOrder.includes(user.id)) {
       queueOrder.push(user.id);
       await prisma.musicState.update({
@@ -39,5 +39,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof Response) return err;
     return Response.json({ error: "加入失败" }, { status: 500 });
+  }
+}
+
+function safeParseArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
 }
