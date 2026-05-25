@@ -34,23 +34,28 @@ export default function MusicPage() {
 
   const fetchMySongs = useCallback(async () => {
     if (!user) return;
-    try { const r = await fetch(apiUrl("/api/music/queue")); setMySongs((await r.json()).songs || []); } catch {}
+    try { const r = await fetch(apiUrl("/api/music/queue")); if (r.ok) setMySongs((await r.json()).songs || []); } catch {}
   }, [user]);
 
   const fetchState = useCallback(async () => {
-    const r = await fetch(apiUrl("/api/music/state"));
-    const d = await r.json();
-    if (d.state) {
-      setCurrentSong(d.state.currentSong);
-      setIsPlaying(d.state.isPlaying || false);
-      setActiveUsers(d.users || []);
-      setSkipVotes(d.skipVotes || []);
-      setSkipThreshold(d.skipThreshold || 1);
-      setCurrentUserSong(d.currentUserSong || null);
-      setFullQueue(d.fullQueue || []);
-      setServerPosition(d.state?.position || 0);
+    try {
+      const r = await fetch(apiUrl("/api/music/state"));
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.state) {
+        setCurrentSong(d.state.currentSong);
+        setIsPlaying(d.state.isPlaying || false);
+        setActiveUsers(d.users || []);
+        setSkipVotes(d.skipVotes || []);
+        setSkipThreshold(d.skipThreshold || 1);
+        setCurrentUserSong(d.currentUserSong || null);
+        setFullQueue(d.fullQueue || []);
+        setServerPosition(d.state?.position || 0);
+      }
+      setJoined(user ? d.state?.queueOrder?.includes(user.id) : false);
+    } catch {
+      // Silently retry on next poll
     }
-    setJoined(user ? d.state?.queueOrder?.includes(user.id) : false);
     setLoading(false);
   }, [user]);
 

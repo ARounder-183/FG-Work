@@ -31,7 +31,8 @@ async function tick(): Promise<void> {
     });
     if (!state || !state.currentSong || !state.isPlaying) return;
 
-    const song = JSON.parse(state.currentSong) as { duration?: number };
+    const song = safeParseJson(state.currentSong) as { duration?: number } | null;
+    if (!song) return;
     const duration = song.duration || 0;
     const startedAt = state.startedAt ? new Date(state.startedAt).getTime() : 0;
     if (duration <= 0 || !startedAt) return;
@@ -82,7 +83,7 @@ export async function advanceToNextSong(): Promise<void> {
     });
   }
 
-  const queueOrder: string[] = JSON.parse(state.queueOrder);
+  const queueOrder: string[] = safeParseArray(state.queueOrder);
 
   // 无活跃用户 → 停止播放
   if (queueOrder.length === 0) {
@@ -103,7 +104,15 @@ export async function advanceToNextSong(): Promise<void> {
       orderBy: { sortOrder: "asc" },
     });
     if (song) {
-      const songData = JSON.parse(song.songData) as { id: number; duration: number };
+      const songData = safeParseJson(song.songData) as { id: number; duration: number } | null;
+      if (!songData) {
+        // 数据损坏 → 标记已播放并跳过
+        await prisma.userSong.updateMany({
+          where: { id: song.id, played: false },
+          data: { played: true },
+        });
+        continue;
+      }
       const urlValid = await validateSongUrl(songData.id);
       if (urlValid) {
         await setCurrentSong(song, songData, state.currentRound);
@@ -129,10 +138,14 @@ export async function advanceToNextSong(): Promise<void> {
   });
 
   if (firstSong) {
-    const songData = JSON.parse(firstSong.songData) as {
-      id: number;
-      duration: number;
-    };
+    const songData = safeParseJson(firstSong.songData) as { id: number; duration: number } | null;
+    if (!songData) {
+      await prisma.userSong.updateMany({
+        where: { id: firstSong.id },
+        data: { played: true },
+      });
+      return advanceToNextSong();
+    }
     const urlValid = await validateSongUrl(songData.id);
     if (urlValid) {
       await setCurrentSong(firstSong, songData, state.currentRound + 1);
@@ -215,4 +228,27 @@ export async function getCurrentPosition(): Promise<number> {
     (Date.now() - new Date(state.startedAt).getTime()) / 1000,
   );
   return Math.max(0, elapsed);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  安全解析工具
+// ════════════════════════════════════════════════════════════════════
+
+function safeParseArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeParseJson(raw: string | null | undefined): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
