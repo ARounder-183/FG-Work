@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
     const toAdd = songList || (song ? [song] : []);
     if (toAdd.length === 0) return Response.json({ error: "请选择歌曲" }, { status: 400 });
 
-    // Simple chronological order: new songs go to the end
     const maxOrder = await prisma.userSong.findFirst({
       orderBy: { sortOrder: "desc" },
       select: { sortOrder: true },
@@ -80,12 +79,12 @@ export async function DELETE(req: NextRequest) {
       await prisma.userSong.deleteMany({ where: { id, userId: user.id } });
     }
 
-    // If no unplayed songs left, clear playback
+    // 如果没有任何未播放歌曲，清除播放
     const remaining = await prisma.userSong.count({ where: { played: false } });
     if (remaining === 0) {
       await prisma.musicState.update({
         where: { id: "singleton" },
-        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
+        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0, startedAt: null },
       });
     }
     return Response.json({ success: true });

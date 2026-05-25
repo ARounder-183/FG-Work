@@ -12,28 +12,14 @@ interface Props {
   onSkipVote: () => void; onForceSkip: () => void; skipVotes: number; skipThreshold: number;
   activeUsers: ActiveUser[]; currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
-  onReportPosition?: (pos: number) => void;
 }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
 function fmtTotal(s: number) { if (s<=0) return "--:--"; return fmt(s); }
 
-// Module-level singletons - survive component unmount/remount
+// Module-level singletons — survive component unmount/remount
 let singletonAudio: HTMLAudioElement | null = null;
 let singletonLastId: number | null = null;
-let singletonReportTimer: ReturnType<typeof setInterval> | null = null;
-let lastAutoSkip = 0;
-
-// Module-level ref for current-user flag
-let isCurrentUserRef = false;
-
-function autoSkip() {
-  if (!isCurrentUserRef) return; // Only the song owner can trigger auto-skip
-  const now = Date.now();
-  if (now - lastAutoSkip < 8000) return; // 8s cooldown
-  lastAutoSkip = now;
-  window.dispatchEvent(new CustomEvent("music-ended"));
-}
 
 function getAudio(): HTMLAudioElement {
   if (!singletonAudio) {
@@ -43,19 +29,16 @@ function getAudio(): HTMLAudioElement {
   return singletonAudio;
 }
 
-export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy, onReportPosition }: Props) {
+export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [lyric, setLyric] = useState<string | null>(null);
   const [currentLine, setCurrentLine] = useState("");
-  const reportRef = useRef(onReportPosition);
-  reportRef.current = onReportPosition;
-  isCurrentUserRef = isCurrentUserSong;
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
 
-  // Setup audio listeners
+  // ── Audio event listeners ──────────────────────────────────────────
   useEffect(() => {
     const a = getAudio();
     const onTime = () => setPosition(a.currentTime);
@@ -63,14 +46,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       const song = currentSongRef.current;
       const playedEnough = song && song.duration > 0 && a.currentTime >= song.duration * 0.9;
       if (!playedEnough) {
-        // Premature end or unknown duration - retry playback
+        // 异常提前结束 → 重试播放
         setTimeout(() => a.play().catch(() => {}), 1000);
-        return;
       }
-      window.dispatchEvent(new CustomEvent("music-ended"));
+      // 正常结束：服务端时钟会自动切歌，客户端无需操作
     };
     const onError = () => {
-      // Client-side error - retry playing, don't skip
+      // 网络/解码错误 → 延迟重试播放，不切歌
       setTimeout(() => {
         if (a.src && a.paused) a.play().catch(() => {});
       }, 2000);
@@ -82,14 +64,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("ended", onEnd);
       a.removeEventListener("error", onError);
-      clearInterval(singletonReportTimer!);
     };
   }, []);
 
-  // Volume
+  // ── Volume ─────────────────────────────────────────────────────────
   useEffect(() => { getAudio().volume = volume; }, [volume]);
 
-  // Load song - deduped by singletonLastId
+  // ── Load song ──────────────────────────────────────────────────────
   useEffect(() => {
     const a = getAudio();
     if (!currentSong) { a.pause(); a.src = ""; singletonLastId = null; return; }
@@ -97,45 +78,45 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     singletonLastId = currentSong.id;
 
     setCoverUrl(null);
-    fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.picUrl)setCoverUrl(d.picUrl)}).catch(()=>{});
 
-    // Fetch song URL with retries
-    let retries = 0;
-    const tryFetchUrl = () => {
-      fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
-      fetch(apiUrl(`/api/music/song?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{
-        if(d.url && singletonAudio){
+    // Fetch cover
+    fetch(apiUrl(`/api/music/song/detail?id=${currentSong.id}`))
+      .then(r => r.json())
+      .then(d => { if (d.picUrl) setCoverUrl(d.picUrl); })
+      .catch(() => {});
+
+    // Fetch song URL (one-shot, no retry — server validates URL at advance time)
+    fetch(apiUrl(`/api/music/song?id=${currentSong.id}`))
+      .then(r => r.json())
+      .then(d => {
+        if (d.url && singletonAudio) {
           singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
           singletonAudio.currentTime = 0;
-          if (isPlaying) singletonAudio.play().catch(()=>{});
-        } else {
-          retries++;
-          if (retries < 3) {
-            setTimeout(tryFetchUrl, 2000);
-          } else {
-            autoSkip();
-          }
+          if (isPlaying) singletonAudio.play().catch(() => {});
         }
-      });
-    };
-    tryFetchUrl();
+        // If no URL: server timer will advance. Client silently waits for next poll.
+      })
+      .catch(() => {});
   }, [currentSong?.id]);
 
-  // Fetch lyric separately (always, not deduped)
+  // ── Fetch lyric ────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentSong) { setLyric(null); return; }
     setLyric(null);
-    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`)).then(r=>r.json()).then(d=>{if(d.lyric)setLyric(d.lyric)}).catch(()=>{});
+    fetch(apiUrl(`/api/music/lyric?id=${currentSong.id}`))
+      .then(r => r.json())
+      .then(d => { if (d.lyric) setLyric(d.lyric); })
+      .catch(() => {});
   }, [currentSong?.id]);
 
-  // Play/pause sync
+  // ── Play/pause sync ────────────────────────────────────────────────
   useEffect(() => {
     const a = getAudio(); if (!a.src) return;
-    if (isPlaying && a.paused) a.play().catch(()=>{});
+    if (isPlaying && a.paused) a.play().catch(() => {});
     else if (!isPlaying && !a.paused) a.pause();
   }, [isPlaying]);
 
-  // Parse LRC and track current line
+  // ── Parse LRC and track current line ───────────────────────────────
   useEffect(() => {
     if (!lyric) { setCurrentLine(""); return; }
     const lines = lyric.split("\n").map((l) => {
@@ -157,22 +138,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     return () => a.removeEventListener("timeupdate", update);
   }, [lyric]);
 
-  // Progress sync
+  // ── Progress sync (all clients follow server) ──────────────────────
   useEffect(() => {
     const a = getAudio();
-    if (isCurrentUserSong) {
-      // Report position
-      singletonReportTimer = setInterval(() => {
-        if (a && !a.paused) reportRef.current?.(Math.floor(a.currentTime));
-      }, 3000);
-      return () => clearInterval(singletonReportTimer!);
-    } else {
-      // Follow server
-      if (a.src && Math.abs(a.currentTime - serverPosition) > 2) {
-        a.currentTime = serverPosition;
-      }
+    if (a.src && Math.abs(a.currentTime - serverPosition) > 2) {
+      a.currentTime = serverPosition;
     }
-  }, [isCurrentUserSong, serverPosition]);
+  }, [serverPosition]);
 
   const dur = currentSong?.duration || 0;
   const pct = dur > 0 ? Math.min((position / dur) * 100, 100) : 0;

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { stopTimer } from "@/lib/music-server";
 
 export async function POST() {
   try {
@@ -15,18 +16,19 @@ export async function POST() {
       data: { queueOrder: JSON.stringify(updated) },
     });
 
-    // Clean up user's votes and mark their songs as played
+    // 清理该用户的投票和歌曲
     await prisma.skipVote.deleteMany({ where: { userId: user.id } });
     await prisma.userSong.updateMany({
       where: { userId: user.id, played: false },
       data: { played: true },
     });
 
-    // If no users left, stop playback immediately
+    // 无人时停止时钟并清除播放
     if (updated.length === 0) {
+      stopTimer();
       await prisma.musicState.update({
         where: { id: "singleton" },
-        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0 },
+        data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0, startedAt: null },
       });
     }
 

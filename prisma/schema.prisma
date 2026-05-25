@@ -105,14 +105,16 @@ model MusicPlaylist {
 
 // Global music state (singleton)
 model MusicState {
-  id                String   @id
-  currentSong       String?  // JSON
-  currentUserSongId String?  // FK-like id of UserSong being played
-  isPlaying         Boolean  @default(false)
-  position          Int      @default(0)
-  currentRound      Int      @default(1)
-  queueOrder        String   @default("[]") // active userIds in order
-  updatedAt         DateTime @updatedAt
+  id                String    @id
+  currentSong       String?   // JSON
+  currentUserSongId String?   // FK-like id of UserSong being played
+  isPlaying         Boolean   @default(false)
+  position          Int       @default(0)
+  currentRound      Int       @default(1)
+  queueOrder        String    @default("[]") // active userIds in order
+  startedAt         DateTime? // when the current song started playing (wall clock)
+  lastAdvanceAt     DateTime? // last time advanceToNextSong was called (debounce)
+  updatedAt         DateTime  @updatedAt
 }
 
 // Per-user song queue

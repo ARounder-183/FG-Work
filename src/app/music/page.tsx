@@ -66,15 +66,6 @@ export default function MusicPage() {
     return () => window.removeEventListener("beforeunload", leave);
   }, [joined]);
 
-  useEffect(() => {
-    const onEnd = async () => {
-      await fetch(apiUrl("/api/music/state"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nextSong: true }) });
-      fetchState(); fetchMySongs();
-    };
-    window.addEventListener("music-ended", onEnd);
-    return () => window.removeEventListener("music-ended", onEnd);
-  }, [fetchState, fetchMySongs]);
-
   const api = {
     join: async () => { await fetch(apiUrl("/api/music/join"), { method: "POST" }); setJoined(true); fetchState(); toast.success("已加入"); },
     leave: async () => { await fetch(apiUrl("/api/music/leave"), { method: "POST" }); setJoined(false); setCurrentSong(null); setIsPlaying(false); fetchState(); },
@@ -86,9 +77,6 @@ export default function MusicPage() {
     clear: async () => { await fetch(apiUrl("/api/music/queue?all=true"), { method: "DELETE" }); fetchMySongs(); toast.success("已清空"); },
     randomize: async () => { const arr = [...mySongs].map((_, i) => ({ id: mySongs[i].id, sortOrder: i })).sort(() => Math.random() - 0.5); await api.reorder(arr.map((x, i) => ({ id: x.id, sortOrder: i }))); toast.success("已随机"); },
     deleteSong: async (id: string) => { await fetch(apiUrl(`/api/music/queue?id=${id}`), { method: "DELETE" }); fetchMySongs(); toast.success("已删除"); },
-    reportPosition: async (pos: number) => {
-      await fetch(apiUrl("/api/music/state"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ position: pos }) });
-    },
   };
 
   if (loading) return <div className="mx-auto max-w-5xl px-4 py-8"><Skeleton className="h-96 w-full" /></div>;
@@ -115,7 +103,6 @@ export default function MusicPage() {
             activeUsers={activeUsers}
             currentUserId={currentUserSong?.userId || null}
             songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
-            onReportPosition={api.reportPosition}
           />
         </div>
 

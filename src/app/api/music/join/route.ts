@@ -1,18 +1,17 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { ensureTimerRunning } from "@/lib/music-server";
 
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
 
-    // Ensure singleton MusicState exists
     let state = await prisma.musicState.findUnique({ where: { id: "singleton" } });
     if (!state) {
       state = await prisma.musicState.create({ data: { id: "singleton" } });
     }
 
-    // Add user to queue order if not already there
     const queueOrder: string[] = JSON.parse(state.queueOrder);
     if (!queueOrder.includes(user.id)) {
       queueOrder.push(user.id);
@@ -21,11 +20,19 @@ export async function POST(req: NextRequest) {
         data: { queueOrder: JSON.stringify(queueOrder) },
       });
 
-      // Reactivate user's songs in the queue
+      // 重新激活用户已播放的歌曲
       await prisma.userSong.updateMany({
         where: { userId: user.id, played: true },
         data: { played: false },
       });
+    }
+
+    // 有歌可播时启动服务端时钟
+    const unplayedCount = await prisma.userSong.count({
+      where: { played: false, userId: { in: queueOrder } },
+    });
+    if (unplayedCount > 0) {
+      ensureTimerRunning();
     }
 
     return Response.json({ success: true });

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { advanceToNextSong } from "../advance";
+import { advanceToNextSong } from "@/lib/music-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,16 +16,16 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const force = searchParams.get("force") === "true";
 
-    // Force skip: only song owner
+    // 强制跳过：仅歌曲 Owner
     if (force) {
       const song = await prisma.userSong.findUnique({ where: { id: songId } });
       if (!song || song.userId !== user.id) return Response.json({ error: "只有点歌人可以跳过" }, { status: 403 });
 
-      await advanceToNextSong(song.userId);
+      await advanceToNextSong();
       return Response.json({ skipped: true, force: true });
     }
 
-    // Toggle vote
+    // 投票切换
     const existing = await prisma.skipVote.findUnique({
       where: { userId_songId: { userId: user.id, songId } },
     });
@@ -40,8 +40,7 @@ export async function POST(req: NextRequest) {
 
     let skipped = false;
     if (voteCount >= threshold && queueOrder.length > 0) {
-      const song = await prisma.userSong.findUnique({ where: { id: songId }, select: { userId: true } });
-      await advanceToNextSong(song?.userId || null);
+      await advanceToNextSong();
       skipped = true;
     }
 
