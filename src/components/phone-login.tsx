@@ -86,15 +86,16 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
           {
             gt,
             challenge,
-            product: "float",
+            product: "bind",
             offline: false,
             new_captcha: true,
           },
           (obj: any) => {
             captchaObj.current = obj;
             obj.onReady(() => {
-              console.log("[geetest] ready, showing");
-              obj.showCaptcha?.() || obj.verify?.();
+              console.log("[geetest] ready, appending");
+              const el = document.getElementById("geetest-box");
+              if (el) obj.appendTo(el);
             });
             obj.onSuccess(() => {
               console.log("[geetest] success");
@@ -194,6 +195,10 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
                   className="h-10 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus:border-primary" />
               </div>
             </div>
+
+            {/* geetest 嵌入容器 */}
+            <div id="geetest-box" className="mb-4 flex justify-center" />
+
             <button onClick={handleSendSms} disabled={sending}
               className="h-10 w-full rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
               {sending ? "获取验证码中..." : "发送验证码"}
