@@ -55,6 +55,9 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   const [favFolders, setFavFolders] = useState<Array<{ id: number; fid: number; title: string; mediaCount: number }>>([]);
   const [favLoading, setFavLoading] = useState(false);
   const [favLoadingId, setFavLoadingId] = useState<number | null>(null);
+  const [favMediaId, setFavMediaId] = useState<number | null>(null);
+  const [favPage, setFavPage] = useState(1);
+  const [favHasMore, setFavHasMore] = useState(false);
 
   const search = async (append = false) => {
     if (!query.trim()) return;
@@ -99,17 +102,25 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   };
 
   // Load favorites folder contents as songs
-  const loadFavFolder = async (mediaId: number) => {
+  const loadFavFolder = async (mediaId: number, append = false) => {
     setFavLoadingId(mediaId);
     try {
-      const r = await fetch(apiUrl(`/api/bilibili/fav/detail?media_id=${mediaId}`));
+      const nextPage = append ? favPage + 1 : 1;
+      const r = await fetch(apiUrl(`/api/bilibili/fav/detail?media_id=${mediaId}&page=${nextPage}`));
       const d = await r.json();
       if (d.songs?.length) {
-        setSongs(d.songs);
-        setTab("video");
-        toast.success(`已加载收藏夹 (${d.songs.length} 首)`);
-        // Clear favorites display
-        setFavFolders([]);
+        if (append) {
+          setSongs((prev) => [...prev, ...d.songs]);
+          setFavPage(nextPage);
+        } else {
+          setSongs(d.songs);
+          setFavPage(1);
+          setFavMediaId(mediaId);
+          setTab("video");
+          setFavFolders([]); // Clear favorites display after load
+        }
+        setFavHasMore(d.hasMore || false);
+        toast.success(append ? `已加载更多 (${d.songs.length} 首)` : `已加载收藏夹 (${d.songs.length} 首)`);
       } else {
         toast.error("加载失败");
       }
@@ -126,6 +137,9 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     setPlaylists([]);
     setDjRadios([]);
     setFavFolders([]);
+    setFavMediaId(null);
+    setFavPage(1);
+    setFavHasMore(false);
     setHasMore(false);
     setNextOffset(0);
     setTab(s === "bilibili" ? "video" : "song");
@@ -288,6 +302,11 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                 {hasMore && (
                   <div className="border-b px-1.5 py-1">
                     <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
+                  </div>
+                )}
+                {favHasMore && favMediaId && (
+                  <div className="border-b px-1.5 py-1">
+                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => loadFavFolder(favMediaId, true)}>加载更多收藏</Button>
                   </div>
                 )}
               </TabsContent>

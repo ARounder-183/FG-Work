@@ -43,12 +43,13 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: `Upstream ${upstream.status}` }, { status: 502 });
     }
 
-    // Stream the response back — passthrough content-type from upstream
+    // Stream the response back — passthrough content-type from upstream.
+    // NOTE: do NOT set Accept-Ranges — we proxy Bilibili DASH audio which
+    // doesn't support seeking; claiming otherwise misleads the browser.
     return new Response(upstream.body, {
       status: 200,
       headers: {
         "Content-Type": upstream.headers.get("Content-Type") || "audio/mp4",
-        "Accept-Ranges": "bytes",
         "Cache-Control": "public, max-age=3600",
       },
     });

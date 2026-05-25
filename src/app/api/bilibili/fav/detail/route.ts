@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
     }
 
     const cookie = decryptCookie(u.bilibiliCookie);
-    const songs = await getFavDetail(mediaId, cookie, page);
+    const { songs, hasMore } = await getFavDetail(mediaId, cookie, page);
 
-    return Response.json({ songs });
+    return Response.json({ songs, hasMore });
   } catch (err) {
     if (err instanceof Response) return err;
     console.error("[Bili Fav Detail]", err);

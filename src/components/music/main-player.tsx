@@ -43,6 +43,8 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const [currentLine, setCurrentLine] = useState("");
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
+  const endedRetries = useRef(0);
+  const errorRetries = useRef(0);
 
   // ── Audio event listeners ──────────────────────────────────────────
   useEffect(() => {
@@ -51,17 +53,19 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     const onEnd = () => {
       const song = currentSongRef.current;
       const playedEnough = song && song.duration > 0 && a.currentTime >= song.duration * 0.9;
-      if (!playedEnough) {
-        // 异常提前结束 → 重试播放
+      if (!playedEnough && endedRetries.current < 3) {
+        endedRetries.current++;
         setTimeout(() => a.play().catch(() => {}), 1000);
       }
-      // 正常结束：服务端时钟会自动切歌，客户端无需操作
+      // 重试 3 次仍未播完或正常结束 → 等服务端时钟切歌
     };
     const onError = () => {
-      // 网络/解码错误 → 延迟重试播放，不切歌
-      setTimeout(() => {
-        if (a.src && a.paused) a.play().catch(() => {});
-      }, 2000);
+      if (errorRetries.current < 3) {
+        errorRetries.current++;
+        setTimeout(() => {
+          if (a.src && a.paused) a.play().catch(() => {});
+        }, 2000);
+      }
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("ended", onEnd);
@@ -85,6 +89,9 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     singletonLastId = songKey ?? null;
 
     setCoverUrl(null);
+    endedRetries.current = 0;
+    errorRetries.current = 0;
+    seekFailCount.current = 0;
 
     // Build query params
     const params = new URLSearchParams();
@@ -178,10 +185,17 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   }, [lyric]);
 
   // ── Progress sync (all clients follow server) ──────────────────────
+  const seekFailCount = useRef(0);
   useEffect(() => {
     const a = getAudio();
-    if (a.src && Math.abs(a.currentTime - serverPosition) > 2) {
+    if (!a.src) return;
+    const drift = Math.abs(a.currentTime - serverPosition);
+    if (drift > 2 && seekFailCount.current < 5) {
       a.currentTime = serverPosition;
+      // Verify seek worked — streaming sources may silently reject seek
+      if (Math.abs(a.currentTime - serverPosition) > 1) {
+        seekFailCount.current++;
+      }
     }
   }, [serverPosition]);
 

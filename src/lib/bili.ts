@@ -362,7 +362,7 @@ export async function getFavDetail(
   mediaId: number,
   cookie: string,
   page = 1,
-): Promise<BiliSong[]> {
+): Promise<{ songs: BiliSong[]; hasMore: boolean }> {
   const data = await biliGet(
     "/x/v3/fav/resource/list",
     {
@@ -374,10 +374,13 @@ export async function getFavDetail(
     { cookie, referer: "https://space.bilibili.com/" },
   );
 
-  const medias = (data as { data?: { medias?: FavMediaItem[] } })?.data?.medias;
-  if (!medias) return [];
+  const result = data as { data?: { medias?: FavMediaItem[]; has_more?: boolean } };
+  const medias = result?.data?.medias;
+  const hasMore = result?.data?.has_more ?? false;
 
-  return medias.map((item) => {
+  if (!medias) return { songs: [], hasMore: false };
+
+  const songs = medias.map((item) => {
     // Extract cid from page info if available
     let cid = 0;
     if (item.pages?.[0]?.cid) {
@@ -399,6 +402,8 @@ export async function getFavDetail(
       aid: item.id,
     };
   });
+
+  return { songs, hasMore };
 }
 
 interface FavMediaItem {
