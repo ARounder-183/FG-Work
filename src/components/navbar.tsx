@@ -186,6 +186,11 @@ export function Navbar() {
                 <span>{user.username}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                {user.role === "admin" && (
+                  <DropdownMenuItem onClick={() => router.push("/admin")}>
+                    管理后台
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   个人中心
                 </DropdownMenuItem>

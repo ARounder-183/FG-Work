@@ -14,6 +14,7 @@ model User {
   password  String
   avatar    String?
   bio       String?
+  role      String   @default("user") // "user" | "admin"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

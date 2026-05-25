@@ -32,7 +32,7 @@ export async function getCurrentUser() {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, username: true, avatar: true, bio: true, createdAt: true },
+    select: { id: true, username: true, avatar: true, bio: true, role: true, createdAt: true },
   });
   return user;
 }
@@ -42,6 +42,15 @@ export async function requireAuth() {
   const user = await getCurrentUser();
   if (!user) {
     throw Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return user;
+}
+
+/** Require admin role - returns user or throws 403 */
+export async function requireAdmin() {
+  const user = await requireAuth();
+  if ((user as { role?: string }).role !== "admin") {
+    throw Response.json({ error: "Forbidden" }, { status: 403 });
   }
   return user;
 }
