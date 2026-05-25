@@ -97,15 +97,17 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
 
       try {
         init(
-          { captchaId: gt, product: "bind", riskType: "slide" },
+          { captchaId: gt, product: "popup" },
           (obj: GeetestCaptchaObj) => {
             captchaObj.current = obj;
             obj.onReady(() => {
+              console.log("[geetest] ready, calling showCaptcha");
               setCaptchaReady(true);
               setCaptchaLoading(false);
               clearTimeout(timer);
             });
             obj.onSuccess(() => {
+              console.log("[geetest] success");
               const r = obj.getValidate();
               doSendSms(r.geetest_challenge, r.geetest_validate, r.geetest_seccode);
             });

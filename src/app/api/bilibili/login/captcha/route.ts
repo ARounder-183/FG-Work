@@ -5,11 +5,13 @@ export async function GET() {
   try {
     await requireAuth();
     const data = await getPhoneCaptcha();
+    console.log("[BILI captcha] result:", data ? "got token" : "null");
     if (!data) {
       return Response.json({ error: "获取验证码失败" }, { status: 500 });
     }
     return Response.json(data);
   } catch (err) {
+    console.error("[BILI captcha] error:", err);
     if (err instanceof Response) return err;
     return Response.json({ error: "获取验证码失败" }, { status: 500 });
   }
