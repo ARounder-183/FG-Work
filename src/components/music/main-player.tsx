@@ -12,6 +12,8 @@ interface Props {
   onSkipVote: () => void; onForceSkip: () => void; skipVotes: number; skipThreshold: number;
   activeUsers: ActiveUser[]; currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
+  /** Pre-cached audio URL from server (B站) — avoids client re-fetching from B站 API */
+  currentAudioUrl?: string | null;
 }
 
 function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
@@ -19,7 +21,7 @@ function fmtTotal(s: number) { if (s<=0) return "--:--"; return fmt(s); }
 
 // Module-level singletons — survive component unmount/remount
 let singletonAudio: HTMLAudioElement | null = null;
-let singletonLastId: number | string | null = null;
+let singletonLastKey: string | null = null;
 
 function getAudio(): HTMLAudioElement {
   if (!singletonAudio) {
@@ -29,7 +31,7 @@ function getAudio(): HTMLAudioElement {
   return singletonAudio;
 }
 
-export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
+export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy, currentAudioUrl }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(() => {
     if (typeof window !== "undefined") {
@@ -63,12 +65,22 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       // 重试 3 次仍未播完或正常结束 → 等服务端时钟切歌
     };
     const onError = () => {
+      // Retry transient errors (up to 3 times)
       if (errorRetries.current < 3) {
         errorRetries.current++;
         setTimeout(() => {
           if (a.src && a.paused) a.play().catch(() => {});
         }, 2000);
+        return;
       }
+
+      // After 3 retries for B站: re-fetch a fresh URL from server (CDN URL may have expired)
+      const song = currentSongRef.current;
+      if (song?.source === "bilibili") {
+        errorRetries.current = 0;
+        refetchBiliUrl(song);
+      }
+      // For NCM: just stop after retries — server timer will advance
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("ended", onEnd);
@@ -80,66 +92,97 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     };
   }, []);
 
+  // ── Re-fetch B站 URL from server on error (CDN URL may have expired) ───
+  function refetchBiliUrl(song: Song) {
+    const params = new URLSearchParams();
+    params.set("source", "bilibili");
+    params.set("bvid", song.bvid || "");
+    params.set("cid", String(song.cid ?? ""));
+    fetch(apiUrl(`/api/music/song?${params.toString()}`))
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.url && singletonAudio) {
+          loadBiliAudio(singletonAudio, d.url as string);
+        }
+      })
+      .catch(() => {});
+  }
+
   // ── Volume ─────────────────────────────────────────────────────────
   useEffect(() => { getAudio().volume = volume; }, [volume]);
 
   // ── Load song ──────────────────────────────────────────────────────
   useEffect(() => {
     const a = getAudio();
-    if (!currentSong) { a.pause(); a.src = ""; singletonLastId = null; return; }
-    const songKey = currentSong.source === "bilibili" ? (currentSong.bvid ?? currentSong.id) : currentSong.id;
-    if (songKey == null || singletonLastId === songKey) return;
-    singletonLastId = songKey ?? null;
+    if (!currentSong) { a.pause(); a.src = ""; singletonLastKey = null; return; }
+    const songKey = currentSong.source === "bilibili"
+      ? `bili:${currentSong.bvid ?? currentSong.id}`
+      : `ncm:${currentSong.id}`;
+    if (songKey == null || singletonLastKey === songKey) return;
+    singletonLastKey = songKey ?? null;
 
     setCoverUrl(null);
     endedRetries.current = 0;
     errorRetries.current = 0;
     seekFailCount.current = 0;
 
-    // Build query params
-    const params = new URLSearchParams();
     const isBili = currentSong.source === "bilibili";
-    if (isBili) {
-      params.set("source", "bilibili");
-      params.set("bvid", currentSong.bvid || "");
-      params.set("cid", String(currentSong.cid ?? ""));
-    } else {
-      params.set("id", String(currentSong.id));
-    }
 
-    // Fetch cover — for Bilibili, use song data directly (already has picUrl from search)
+    // ── Cover ──────────────────────────────────────────────────────────
     if (isBili) {
-      // Bilibili cover from song data — proxy handles protocol + Referer
       if (currentSong.picUrl) setCoverUrl(currentSong.picUrl);
     } else {
-      // NCM: need separate API to get cover
       const detailParams = new URLSearchParams();
       detailParams.set("id", String(currentSong.id));
       fetch(apiUrl(`/api/music/song/detail?${detailParams.toString()}`))
-        .then(r => r.json())
-        .then(d => { if (d.picUrl) setCoverUrl(d.picUrl); })
+        .then((r) => r.json())
+        .then((d) => { if (d.picUrl) setCoverUrl(d.picUrl); })
         .catch(() => {});
     }
 
-    // Fetch song URL (one-shot, no retry — server validates URL at advance time)
-    fetch(apiUrl(`/api/music/song?${params.toString()}`))
-      .then(r => r.json())
-      .then(d => {
-        if (d.url && singletonAudio) {
-          if (isBili) {
-            // Bilibili CDN requires Referer — proxy through our server
-            const encoded = btoa(d.url);
-            singletonAudio.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
-          } else {
+    // ── Audio URL ──────────────────────────────────────────────────────
+    if (isBili) {
+      // B站: prefer server-cached URL (injected via prop from state poll), fall back to API fetch
+      if (currentAudioUrl && currentAudioUrl.length > 0) {
+        loadBiliAudio(a, currentAudioUrl);
+      } else {
+        // No cached URL — fetch from server (server may not have validated yet)
+        const params = new URLSearchParams();
+        params.set("source", "bilibili");
+        params.set("bvid", currentSong.bvid || "");
+        params.set("cid", String(currentSong.cid ?? ""));
+        fetch(apiUrl(`/api/music/song?${params.toString()}`))
+          .then((r) => r.json())
+          .then((d) => { if (d.url && singletonAudio) loadBiliAudio(singletonAudio, d.url as string); })
+          .catch(() => {});
+      }
+    } else {
+      // NCM: direct URL — no proxy needed
+      const params = new URLSearchParams();
+      params.set("id", String(currentSong.id));
+      fetch(apiUrl(`/api/music/song?${params.toString()}`))
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.url && singletonAudio) {
             singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
+            singletonAudio.currentTime = serverPositionRef.current || 0;
+            if (isPlaying) singletonAudio.play().catch(() => {});
           }
-          singletonAudio.currentTime = serverPositionRef.current || 0;
-          if (isPlaying) singletonAudio.play().catch(() => {});
-        }
-        // If no URL: server timer will advance. Client silently waits for next poll.
-      })
-      .catch(() => {});
-  }, [currentSong?.id, currentSong?.bvid]);
+        })
+        .catch(() => {});
+    }
+  }, [currentSong?.id, currentSong?.bvid, currentAudioUrl]);
+
+  /** Load B站 audio: direct CDN access (no proxy) */
+  function loadBiliAudio(a: HTMLAudioElement, rawUrl: string) {
+    errorRetries.current = 0;
+
+    // Ensure HTTPS for browser (B站 CDN URLs can be http)
+    const finalUrl = rawUrl.replace(/^http:\/\//, "https://");
+    a.src = finalUrl;
+    a.currentTime = serverPositionRef.current || 0;
+    if (isPlaying) a.play().catch(() => {});
+  }
 
   // ── Fetch lyric ────────────────────────────────────────────────────
   useEffect(() => {
@@ -153,8 +196,8 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
       lyricParams.set("id", String(currentSong.id));
     }
     fetch(apiUrl(`/api/music/lyric?${lyricParams.toString()}`))
-      .then(r => r.json())
-      .then(d => { if (d.lyric) setLyric(d.lyric); })
+      .then((r) => r.json())
+      .then((d) => { if (d.lyric) setLyric(d.lyric); })
       .catch(() => {});
   }, [currentSong?.id, currentSong?.bvid]);
 

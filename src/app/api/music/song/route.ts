@@ -18,7 +18,17 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: "B站歌曲需要 bvid" }, { status: 400 });
     }
 
-    // Try with user's cookie if logged in (reduces anti-bot risk)
+    // Check if server already cached the audio URL (set during advanceToNextSong's validate)
+    const state = await prisma.musicState.findUnique({
+      where: { id: "singleton" },
+      select: { currentAudioUrl: true },
+    });
+    if (state?.currentAudioUrl) {
+      // Don't rewrite bilibili CDN URLs to https — they use custom schemes
+      return Response.json({ url: state.currentAudioUrl });
+    }
+
+    // Fallback: fetch fresh URL (e.g. when URL expired and client re-requests)
     let cookie: string | undefined;
     try {
       const user = await getCurrentUser().catch(() => null);

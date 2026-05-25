@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { getVideoInfo } from "@/lib/bili";
 
 export async function GET() {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     const user = await requireAuth();
     const { song, songs: songList } = await req.json();
 
-    const toAdd = songList || (song ? [song] : []);
+    const toAdd: unknown[] = songList || (song ? [song] : []);
     if (toAdd.length === 0) return Response.json({ error: "请选择歌曲" }, { status: 400 });
 
     const maxOrder = await prisma.userSong.findFirst({
@@ -31,9 +32,25 @@ export async function POST(req: NextRequest) {
     let nextOrder = (maxOrder?.sortOrder ?? -1) + 1;
 
     for (const s of toAdd) {
+      // Pre-resolve CID for B站 songs (search results have cid=0)
+      const songObj = s as Record<string, unknown>;
+      if (songObj.source === "bilibili" && songObj.bvid && (!songObj.cid || (songObj.cid as number) <= 0)) {
+        try {
+          const info = await getVideoInfo(songObj.bvid as string);
+          if (info?.cid) {
+            songObj.cid = info.cid;
+            // Also fill in missing metadata
+            if (!songObj.duration) songObj.duration = info.duration;
+            if (!songObj.picUrl && info.pic) songObj.picUrl = info.pic.replace(/^\/\//, "https://");
+          }
+        } catch {
+          // Silent — cid will be resolved later at play time
+        }
+      }
+
       await prisma.userSong.create({
         data: {
-          songData: JSON.stringify(s),
+          songData: JSON.stringify(songObj),
           userId: user.id,
           sortOrder: nextOrder++,
         },

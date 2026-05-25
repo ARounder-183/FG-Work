@@ -169,6 +169,7 @@ async function setCurrentSong(
       currentTurnIndex: nextTurnIdx,
       startedAt: new Date(),
       lastAdvanceAt: new Date(),
+      currentAudioUrl: null, // will be set by validateSongUrl during advance cycle
     },
   });
   ensureTimerRunning();
@@ -191,6 +192,7 @@ async function clearPlayback(): Promise<void> {
       position: 0,
       startedAt: null,
       lastAdvanceAt: new Date(),
+      currentAudioUrl: null,
     },
   });
 }
@@ -202,7 +204,15 @@ async function validateSongUrl(songData: SongData): Promise<boolean> {
     if (source === "bilibili" && songData.bvid) {
       // cid may be 0 (search results don't include it) — getAudioUrl auto-resolves
       const url = await getBiliAudioUrl(songData.bvid, songData.cid ?? 0);
-      return url !== null && url.length > 0;
+      if (url && url.length > 0) {
+        // Cache the validated URL so the client doesn't need to re-fetch from B站 API
+        await prisma.musicState.update({
+          where: { id: "singleton" },
+          data: { currentAudioUrl: url },
+        });
+        return true;
+      }
+      return false;
     }
 
     if (songData.id) {

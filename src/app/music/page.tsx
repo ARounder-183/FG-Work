@@ -36,6 +36,7 @@ export default function MusicPage() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [biliLoggedIn, setBiliLoggedIn] = useState(false);
   const [biliUname, setBiliUname] = useState("");
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
 
   const fetchMySongs = useCallback(async () => {
     if (!user) return;
@@ -56,6 +57,7 @@ export default function MusicPage() {
         setCurrentUserSong(d.currentUserSong || null);
         setFullQueue(d.fullQueue || []);
         setServerPosition(d.state?.position || 0);
+        setCurrentAudioUrl(d.currentAudioUrl || null);
       }
       setJoined(user ? d.state?.queueOrder?.includes(user.id) : false);
     } catch {
@@ -126,6 +128,7 @@ export default function MusicPage() {
             activeUsers={activeUsers}
             currentUserId={currentUserSong?.userId || null}
             songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
+            currentAudioUrl={currentAudioUrl}
           />
         </div>
 
