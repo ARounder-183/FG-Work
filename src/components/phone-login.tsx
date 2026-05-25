@@ -20,11 +20,6 @@ interface GeetestCaptchaObj {
   getValidate(): { geetest_challenge: string; geetest_validate: string; geetest_seccode: string };
 }
 
-declare const initGeetest4: (
-  config: { captchaId: string; product: string; riskType?: string },
-  cb: (obj: GeetestCaptchaObj) => void,
-) => void;
-
 export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   const [step, setStep] = useState<"phone" | "sms">("phone");
   const [tel, setTel] = useState("");
@@ -34,6 +29,7 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   const [sending, setSending] = useState(false);
   const [logging, setLogging] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [captchaLoading, setCaptchaLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const captchaObj = useRef<GeetestCaptchaObj | null>(null);
   const tokenRef = useRef<string>("");
@@ -51,18 +47,25 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
     setLogging(false);
     setCountdown(0);
     setError(null);
+    setCaptchaLoading(true);
 
     fetch(apiUrl("/api/bilibili/login/captcha"))
       .then((r) => r.json())
       .then((d) => {
-        if (d.token && d.geetest) {
+        console.log("[phone] captcha response:", d);
+        if (d.token && d.geetest?.gt) {
           tokenRef.current = d.token;
           loadGeetest(d.geetest.gt, d.geetest.challenge);
         } else {
-          setError("获取验证码失败");
+          setError("获取验证码失败: " + (d.error || "无 token"));
+          setCaptchaLoading(false);
         }
       })
-      .catch(() => setError("网络错误"));
+      .catch((err) => {
+        console.error("[phone] captcha fetch error:", err);
+        setError("网络错误");
+        setCaptchaLoading(false);
+      });
 
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
@@ -70,18 +73,38 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   }, [open]);
 
   function loadGeetest(gt: string, challenge: string) {
-    const existing = document.querySelector("script[src*='gt4.js']");
+    const existing = document.querySelector("script[src*='geetest']");
     if (existing) existing.remove();
+
+    // 10s timeout fallback
+    const timer = setTimeout(() => {
+      if (!captchaReady) {
+        setError("验证组件加载超时");
+        setCaptchaLoading(false);
+      }
+    }, 10000);
+
     const script = document.createElement("script");
     script.src = "https://static.geetest.com/v4/gt4.js";
     script.onload = () => {
+      const init = (window as any).initGeetest4;
+      if (!init) {
+        setError("验证组件初始化失败(initGeetest4 not found)");
+        setCaptchaLoading(false);
+        clearTimeout(timer);
+        return;
+      }
+
       try {
-        initGeetest4(
+        init(
           { captchaId: gt, product: "bind", riskType: "slide" },
-          (obj) => {
+          (obj: GeetestCaptchaObj) => {
             captchaObj.current = obj;
-            obj.onReady(() => setCaptchaReady(true));
-            // On captcha success → auto-send SMS
+            obj.onReady(() => {
+              setCaptchaReady(true);
+              setCaptchaLoading(false);
+              clearTimeout(timer);
+            });
             obj.onSuccess(() => {
               const r = obj.getValidate();
               doSendSms(r.geetest_challenge, r.geetest_validate, r.geetest_seccode);
@@ -89,14 +112,25 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
             obj.onError(() => {
               setError("人机验证失败，请重试");
               setSending(false);
+              setCaptchaLoading(false);
+            });
+            obj.onClose(() => {
+              setSending(false);
             });
           },
         );
-      } catch {
+      } catch (e) {
+        console.error("[geetest] init exception:", e);
         setError("验证组件加载失败");
+        setCaptchaLoading(false);
+        clearTimeout(timer);
       }
     };
-    script.onerror = () => setError("验证组件加载失败");
+    script.onerror = () => {
+      setError("验证组件加载失败，请检查网络");
+      setCaptchaLoading(false);
+      clearTimeout(timer);
+    };
     document.head.appendChild(script);
   }
 
@@ -106,12 +140,33 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
       toast.error("请输入正确的手机号");
       return;
     }
+    // If previously errored, retry loading captcha
+    if (error) {
+      setError(null);
+      setCaptchaLoading(true);
+      setCaptchaReady(false);
+      fetch(apiUrl("/api/bilibili/login/captcha"))
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.token && d.geetest?.gt) {
+            tokenRef.current = d.token;
+            loadGeetest(d.geetest.gt, d.geetest.challenge);
+          } else {
+            setError("获取验证码失败");
+            setCaptchaLoading(false);
+          }
+        })
+        .catch(() => {
+          setError("网络错误");
+          setCaptchaLoading(false);
+        });
+      return;
+    }
     if (!captchaReady || !captchaObj.current) {
-      toast.error("验证码组件未就绪");
+      toast.error("验证组件未就绪");
       return;
     }
     setSending(true);
-    setError(null);
     captchaObj.current.showCaptcha();
   }
 
@@ -212,10 +267,10 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
 
             <button
               onClick={handleSendSms}
-              disabled={sending || !captchaReady}
+              disabled={sending}
               className="h-10 w-full rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {sending ? "验证中..." : "发送验证码"}
+              {captchaLoading ? "验证组件加载中..." : sending ? "验证中..." : error ? "重新加载" : "发送验证码"}
             </button>
           </>
         ) : (
