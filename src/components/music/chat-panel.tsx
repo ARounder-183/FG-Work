@@ -43,7 +43,7 @@ export function ChatPanel() {
     // First load: mark all as seen, don't speak
     if (isFirstLoad.current) {
       msgs.forEach((m) => seenIds.current.add(m.id));
-      isFirstLoad.current = false;
+      // isFirstLoad is reset in the scroll effect (after DOM renders)
       return;
     }
 
@@ -104,7 +104,12 @@ export function ChatPanel() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (isFirstLoad.current || el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+    if (isFirstLoad.current) {
+      el.scrollTop = el.scrollHeight;
+      isFirstLoad.current = false;
+      return;
+    }
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
