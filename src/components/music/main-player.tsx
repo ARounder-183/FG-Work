@@ -20,7 +20,6 @@ function fmtTotal(s: number) { if (s<=0) return "--:--"; return fmt(s); }
 // Module-level singletons — survive component unmount/remount
 let singletonAudio: HTMLAudioElement | null = null;
 let singletonLastKey: string | null = null;
-let swRegistered = false;
 
 function getAudio(): HTMLAudioElement {
   if (!singletonAudio) {
@@ -28,27 +27,6 @@ function getAudio(): HTMLAudioElement {
     singletonAudio.volume = 0.7;
   }
   return singletonAudio;
-}
-
-/** Register Service Worker to fix B站 CDN Referer headers */
-async function ensureSW(): Promise<boolean> {
-  if (swRegistered) return true;
-  if (!("serviceWorker" in navigator)) return false;
-  try {
-    const reg = await navigator.serviceWorker.register("/sw-bili.js", { scope: "/" });
-    // Wait for activation
-    if (reg.installing) {
-      await new Promise<void>((resolve) => {
-        reg.installing!.addEventListener("statechange", () => {
-          if (reg.installing!.state === "activated") resolve();
-        });
-      });
-    }
-    swRegistered = true;
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
@@ -70,11 +48,6 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const endedRetries = useRef(0);
   const errorRetries = useRef(0);
   const seekFailCount = useRef(0);
-  // Track current raw CDN URL for proxy fallback
-  const biliRawUrl = useRef<string | null>(null);
-
-  // ── Register Service Worker for B站 Referer injection ──────────────
-  useEffect(() => { ensureSW(); }, []);
 
   // ── Audio event listeners ──────────────────────────────────────────
   useEffect(() => {
@@ -99,23 +72,11 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
         return;
       }
 
+      // After 3 retries for B站: re-fetch a fresh URL from server (CDN URL may have expired)
       const song = currentSongRef.current;
       if (song?.source === "bilibili") {
-        // Direct access failed (SW not active / CDN rejected) — fall back to proxy
-        if (biliRawUrl.current && !a.src.startsWith(apiUrl(""))) {
-          // Currently on direct URL → switch to proxy
-          console.warn("[播放器] SW 直连失败 → 降级到代理");
-          errorRetries.current = 0;
-          const encoded = btoa(biliRawUrl.current);
-          a.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
-          a.currentTime = serverPositionRef.current || 0;
-          a.play().catch(() => {});
-        } else {
-          // Already on proxy — re-fetch fresh URL from server
-          console.warn("[播放器] 代理也失败 → 重新获取 B站 URL");
-          errorRetries.current = 0;
-          refetchBiliUrl(song);
-        }
+        errorRetries.current = 0;
+        refetchBiliUrl(song);
       }
       // For NCM: just stop after retries — server timer will advance
     };
@@ -162,7 +123,6 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     endedRetries.current = 0;
     errorRetries.current = 0;
     seekFailCount.current = 0;
-    biliRawUrl.current = null;
 
     const isBili = currentSong.source === "bilibili";
 
@@ -206,15 +166,13 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     }
   }, [currentSong?.id, currentSong?.bvid]);
 
-  /** Load B站 audio: direct CDN via Service Worker (adds Referer), proxy fallback */
+  /** Load B站 audio through proxy (B站 CDN requires Referer: bilibili.com) */
   function loadBiliAudio(a: HTMLAudioElement, rawUrl: string) {
-    biliRawUrl.current = rawUrl;
     errorRetries.current = 0;
 
-    // Service Worker intercepts *.bilivideo.com requests and injects Referer header
-    const finalUrl = rawUrl.replace(/^http:\/\//, "https://");
-    console.log("[播放器] SW 直连模式:", finalUrl.slice(0, 80));
-    a.src = finalUrl;
+    // 通过服务器代理请求 B站 CDN，代理添加 Referer 头
+    const encoded = btoa(rawUrl);
+    a.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
     a.currentTime = serverPositionRef.current || 0;
     if (isPlaying) a.play().catch(() => {});
   }
