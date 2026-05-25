@@ -424,16 +424,31 @@ export async function generateQRCode(): Promise<{
   url: string;
   qrcodeKey: string;
 }> {
-  const res = await fetch(
-    `${PASSPORT_HOST}/x/passport-login/web/qrcode/generate`,
-    { headers: { "User-Agent": UA } },
-  );
-  const json = (await res.json()) as {
-    code: number;
-    data?: { url: string; qrcode_key: string };
-  };
+  const params = new URLSearchParams();
+  params.set("local_id", crypto.randomBytes(16).toString("hex"));
+  params.set("ts", String(Date.now()));
+
+  const url = `${PASSPORT_HOST}/x/passport-login/web/qrcode/generate?${params.toString()}`;
+  console.log("[BILI QR] generate →", url);
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      Referer: "https://www.bilibili.com/",
+    },
+  });
+  const text = await res.text();
+  console.log("[BILI QR] generate ←", res.status, text.slice(0, 200));
+
+  let json: { code: number; data?: { url: string; qrcode_key: string } };
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`QR generate returned non-JSON: ${text.slice(0, 100)}`);
+  }
+
   if (json.code !== 0 || !json.data) {
-    throw new Error(`QR generate failed: ${JSON.stringify(json)}`);
+    throw new Error(`QR generate failed: code=${json.code}`);
   }
   return { url: json.data.url, qrcodeKey: json.data.qrcode_key };
 }
@@ -445,21 +460,28 @@ export type QRCodeStatus =
   | { status: "success"; code: 0; cookies: string };
 
 export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
-  const url = new URL(
-    "/x/passport-login/web/qrcode/poll",
-    PASSPORT_HOST,
-  );
-  url.searchParams.set("qrcode_key", qrcodeKey);
+  const params = new URLSearchParams();
+  params.set("qrcode_key", qrcodeKey);
+  params.set("source", "main-fe-header");
+  params.set("ts", String(Date.now()));
 
-  const res = await fetch(url.toString(), {
-    headers: { "User-Agent": UA },
-    redirect: "manual",
+  const url = `${PASSPORT_HOST}/x/passport-login/web/qrcode/poll?${params.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      Referer: "https://www.bilibili.com/",
+    },
   });
-  const json = (await res.json()) as {
-    code: number;
-    message?: string;
-    data?: { code: number; message?: string };
-  };
+  const text = await res.text();
+  console.log("[BILI QR] poll ←", res.status, text.slice(0, 200));
+
+  let json: { code: number; message?: string; data?: { code: number; message?: string } };
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { status: "pending", code: 86101 };
+  }
 
   const dataCode = json.data?.code ?? json.code;
 
@@ -475,6 +497,7 @@ export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
     case 86038:
       return { status: "expired", code: 86038 };
     default:
+      console.log("[BILI QR] poll unknown code:", dataCode);
       return { status: "pending", code: 86101 };
   }
 }
