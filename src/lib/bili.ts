@@ -491,6 +491,130 @@ export async function pollQRCode(qrcodeKey: string): Promise<QRCodeStatus> {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  Login: Phone SMS (ref: BBPlayer)
+// ════════════════════════════════════════════════════════════════════
+
+export interface PhoneCaptchaData {
+  token: string;
+  geetest: { gt: string; challenge: string };
+}
+
+/** 获取手机号登录的图形验证 token */
+export async function getPhoneCaptcha(): Promise<PhoneCaptchaData | null> {
+  try {
+    const res = await fetch(
+      `${PASSPORT_HOST}/x/passport-login/captcha?source=main_web&t=${Date.now()}`,
+      {
+        headers: {
+          "User-Agent": PASSPORT_UA,
+          Referer: "https://www.bilibili.com/",
+        },
+      },
+    );
+    const json = (await res.json()) as {
+      code: number;
+      data?: { token: string; geetest: { gt: string; challenge: string } };
+    };
+    if (json.code !== 0 || !json.data) return null;
+    return { token: json.data.token, geetest: json.data.geetest };
+  } catch {
+    return null;
+  }
+}
+
+/** 发送手机短信验证码 */
+export async function sendPhoneSms(
+  tel: string,
+  cid: string,
+  token: string,
+  challenge: string,
+  validate: string,
+  seccode: string,
+): Promise<string | null> {
+  try {
+    const body = new URLSearchParams({
+      cid,
+      tel,
+      source: "main_mini_login",
+      token,
+      challenge,
+      validate,
+      seccode,
+    });
+    const res = await fetch(
+      `${PASSPORT_HOST}/x/passport-login/web/sms/send`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": PASSPORT_UA,
+          Referer: "https://www.bilibili.com/",
+          Origin: "https://www.bilibili.com",
+        },
+        body: body.toString(),
+      },
+    );
+    const json = (await res.json()) as {
+      code: number;
+      message?: string;
+      data?: { captcha_key: string };
+    };
+    if (json.code !== 0 || !json.data?.captcha_key) {
+      console.warn("[BILI SMS] send failed:", json);
+      return null;
+    }
+    return json.data.captcha_key;
+  } catch {
+    return null;
+  }
+}
+
+/** 使用短信验证码登录，返回 cookie 字符串 */
+export async function loginWithPhoneSms(
+  tel: string,
+  cid: string,
+  code: string,
+  captchaKey: string,
+): Promise<string | null> {
+  try {
+    const body = new URLSearchParams({
+      cid,
+      tel,
+      code,
+      source: "main_mini_login",
+      captcha_key: captchaKey,
+      keep: "1",
+    });
+    const res = await fetch(
+      `${PASSPORT_HOST}/x/passport-login/web/login/sms`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": PASSPORT_UA,
+          Referer: "https://www.bilibili.com/",
+          Origin: "https://www.bilibili.com",
+        },
+        body: body.toString(),
+      },
+    );
+    const json = (await res.json()) as {
+      code: number;
+      message?: string;
+      data?: { status: number };
+    };
+    if (json.code !== 0) {
+      console.warn("[BILI SMS] login failed:", json);
+      return null;
+    }
+    const cookies = res.headers.getSetCookie?.() ?? [];
+    return cookies.join("; ");
+  } catch {
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  Utils
 // ════════════════════════════════════════════════════════════════════
 

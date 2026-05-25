@@ -36,9 +36,10 @@ interface Props {
   biliLoggedIn?: boolean;
   biliUname?: string;
   onBiliLogin?: () => void;
+  onPhoneLogin?: () => void;
 }
 
-export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs, biliLoggedIn, biliUname, onBiliLogin }: Props) {
+export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs, biliLoggedIn, biliUname, onBiliLogin, onPhoneLogin }: Props) {
   const [searchOpen, setSearchOpen] = useState(true);
   const [myOpen, setMyOpen] = useState(true);
   const [source, setSource] = useState<"ncm" | "bilibili">("ncm");
@@ -267,14 +268,24 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
                 ) : (
                   <span className="text-[10px] text-muted-foreground">🔐 未登录</span>
                 )}
-                <Button
-                  size="sm"
-                  variant={biliLoggedIn ? "ghost" : "outline"}
-                  className="h-5 text-[9px]"
-                  onClick={onBiliLogin}
-                >
-                  {biliLoggedIn ? "切换" : "登录"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={biliLoggedIn ? "ghost" : "outline"}
+                    className="h-5 text-[9px]"
+                    onClick={onBiliLogin}
+                  >
+                    {biliLoggedIn ? "切换" : "扫码"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={biliLoggedIn ? "ghost" : "outline"}
+                    className="h-5 text-[9px]"
+                    onClick={onPhoneLogin}
+                  >
+                    短信
+                  </Button>
+                </div>
               </div>
             <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
               <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">

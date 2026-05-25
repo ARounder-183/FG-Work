@@ -9,6 +9,7 @@ import { MainPlayer } from "@/components/music/main-player";
 import { RightPanels } from "@/components/music/right-panels";
 import { ChatPanel } from "@/components/music/chat-panel";
 import { BilibiliLogin } from "@/components/bilibili-login";
+import { PhoneLogin } from "@/components/phone-login";
 import { toast } from "sonner";
 
 interface Song {
@@ -34,6 +35,7 @@ export default function MusicPage() {
   const [loading, setLoading] = useState(true);
   const [queueOpen, setQueueOpen] = useState(true);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [phoneLoginOpen, setPhoneLoginOpen] = useState(false);
   const [biliLoggedIn, setBiliLoggedIn] = useState(false);
   const [biliUname, setBiliUname] = useState("");
 
@@ -182,12 +184,22 @@ export default function MusicPage() {
         biliLoggedIn={biliLoggedIn}
         biliUname={biliUname}
         onBiliLogin={() => setLoginOpen(true)}
+        onPhoneLogin={() => setPhoneLoginOpen(true)}
       />
     </div>
 
     <BilibiliLogin
       open={loginOpen}
       onClose={() => setLoginOpen(false)}
+      onLoginSuccess={(uname) => {
+        setBiliLoggedIn(true);
+        setBiliUname(uname);
+      }}
+    />
+
+    <PhoneLogin
+      open={phoneLoginOpen}
+      onClose={() => setPhoneLoginOpen(false)}
       onLoginSuccess={(uname) => {
         setBiliLoggedIn(true);
         setBiliUname(uname);
