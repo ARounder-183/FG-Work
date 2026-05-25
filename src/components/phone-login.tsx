@@ -10,15 +10,6 @@ interface Props {
   onLoginSuccess: (uname: string) => void;
 }
 
-interface GeetestCaptchaObj {
-  showCaptcha(): void;
-  onReady(fn: () => void): void;
-  onSuccess(fn: () => void): void;
-  onError(fn: (err: unknown) => void): void;
-  onClose(fn: () => void): void;
-  getValidate(): { geetest_challenge: string; geetest_validate: string; geetest_seccode: string };
-}
-
 export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   const [step, setStep] = useState<"phone" | "sms">("phone");
   const [tel, setTel] = useState("");
@@ -28,7 +19,7 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   const [logging, setLogging] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const captchaObj = useRef<GeetestCaptchaObj | null>(null);
+  const captchaObj = useRef<any>(null);
   const tokenRef = useRef<string>("");
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -81,35 +72,47 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
     if (old) old.remove();
 
     const script = document.createElement("script");
-    script.src = "https://static.geetest.com/v4/gt4.js";
+    // B站 使用 geetest v3 SDK
+    script.src = "https://static.geetest.com/static/js/gt.0.4.9.js";
     script.onload = () => {
-      const init = (window as any).initGeetest4;
+      const init = (window as any).initGeetest;
       if (!init) {
         setSending(false);
-        setError("验证组件加载失败");
+        setError("验证组件加载失败(initGeetest not found)");
         return;
       }
       try {
-        init({ captchaId: gt, product: "popup" }, (obj: GeetestCaptchaObj) => {
-          captchaObj.current = obj;
-          obj.onReady(() => {
-            console.log("[geetest] ready");
-            obj.showCaptcha();
-          });
-          obj.onSuccess(() => {
-            console.log("[geetest] success");
-            const r = obj.getValidate();
-            doSendSms(r.geetest_challenge, r.geetest_validate, r.geetest_seccode);
-          });
-          obj.onError(() => {
-            setSending(false);
-            setError("人机验证失败，请重试");
-          });
-          obj.onClose(() => {
-            setSending(false);
-          });
-        });
-      } catch {
+        init(
+          {
+            gt,
+            challenge,
+            product: "float",
+            offline: false,
+            new_captcha: true,
+          },
+          (obj: any) => {
+            captchaObj.current = obj;
+            obj.onReady(() => {
+              console.log("[geetest] ready, showing");
+              obj.showCaptcha?.() || obj.verify?.();
+            });
+            obj.onSuccess(() => {
+              console.log("[geetest] success");
+              const r = obj.getValidate();
+              doSendSms(r.geetest_challenge, r.geetest_validate, r.geetest_seccode);
+            });
+            obj.onError((err: unknown) => {
+              console.warn("[geetest] error:", err);
+              setSending(false);
+              setError("人机验证失败，请重试");
+            });
+            obj.onClose(() => {
+              setSending(false);
+            });
+          },
+        );
+      } catch (e) {
+        console.error("[geetest] exception:", e);
         setSending(false);
         setError("验证组件加载失败");
       }
