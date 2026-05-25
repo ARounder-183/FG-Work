@@ -2,12 +2,13 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     await requireAdmin();
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-    if (!id) return Response.json({ error: "缺少用户 ID" }, { status: 400 });
+    const { id } = await params;
 
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return Response.json({ error: "用户不存在" }, { status: 404 });
@@ -23,11 +24,15 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     const admin = await requireAdmin();
-    const { id, role } = await req.json();
-    if (!id || !role) return Response.json({ error: "参数不完整" }, { status: 400 });
+    const { id } = await params;
+    const { role } = await req.json();
+    if (!role) return Response.json({ error: "参数不完整" }, { status: 400 });
     if (!["user", "admin"].includes(role)) return Response.json({ error: "无效角色" }, { status: 400 });
 
     const target = await prisma.user.findUnique({ where: { id } });

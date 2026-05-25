@@ -77,7 +77,7 @@ function UsersTab() {
 
   const setRole = async (id: string, role: string) => {
     const r = await fetch(apiUrl(`/api/admin/users/${id}`), {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, role }),
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }),
     });
     const d = await r.json();
     toast(d.success ? "角色已更新" : (d.error || "失败"));
