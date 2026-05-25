@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: "缺少 key" }, { status: 400 });
     }
 
-    console.log("[BILI QR] route poll, key:", qrcodeKey.slice(0, 16));
     const result = await pollQRCode(qrcodeKey);
 
     if (result.status === "success") {
