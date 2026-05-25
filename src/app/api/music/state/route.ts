@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 import { advanceToNextSong, ensureTimerRunning, getCurrentPosition } from "@/lib/music-server";
 
 export async function GET() {
@@ -8,6 +9,52 @@ export async function GET() {
     if (!state) state = await prisma.musicState.create({ data: { id: "singleton" } });
 
     const queueOrder: string[] = safeParseArray(state.queueOrder);
+
+    // ── 心跳：更新当前用户 lastSeenAt，踢出超时用户 ──────────────────
+    const currentUser = await getCurrentUser();
+    if (currentUser) {
+      await prisma.user.update({
+        where: { id: currentUser.id },
+        data: { lastSeenAt: new Date() },
+      });
+    }
+
+    if (queueOrder.length > 0) {
+      const staleThreshold = new Date(Date.now() - 15_000);
+      const activeUserIds = await prisma.user.findMany({
+        where: { id: { in: queueOrder }, lastSeenAt: { gte: staleThreshold } },
+        select: { id: true },
+      });
+      const activeSet = new Set(activeUserIds.map((u) => u.id));
+
+      const stale = queueOrder.filter((id) => !activeSet.has(id));
+      if (stale.length > 0) {
+        // Remove stale users from queue
+        const updatedOrder = queueOrder.filter((id) => activeSet.has(id));
+        await prisma.musicState.update({
+          where: { id: "singleton" },
+          data: {
+            queueOrder: JSON.stringify(updatedOrder),
+            currentTurnIndex: updatedOrder.length > 0 ? state.currentTurnIndex % updatedOrder.length : 0,
+          },
+        });
+
+        // Mark their songs as played and clear votes
+        await prisma.userSong.updateMany({
+          where: { userId: { in: stale }, played: false },
+          data: { played: true },
+        });
+        await prisma.skipVote.deleteMany({ where: { userId: { in: stale } } });
+
+        // Refresh state after cleanup
+        state = (await prisma.musicState.findUnique({ where: { id: "singleton" } }))!;
+        // Re-parse queueOrder after cleanup
+        const newOrder = safeParseArray(state.queueOrder);
+        // Replace queueOrder reference for rest of handler
+        queueOrder.length = 0;
+        queueOrder.push(...newOrder);
+      }
+    }
 
     // 无活跃用户 → 清除播放
     if (queueOrder.length === 0 && state.currentSong) {

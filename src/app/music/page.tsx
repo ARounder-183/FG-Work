@@ -62,13 +62,23 @@ export default function MusicPage() {
   useEffect(() => { fetchState(); fetchMySongs(); }, [fetchState, fetchMySongs]);
   useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 2000); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
 
-  // Auto-leave on page close
+  // Auto-leave on page close / tab hidden
   useEffect(() => {
     const leave = () => {
       if (joined) navigator.sendBeacon(apiUrl("/api/music/leave"));
     };
+    const onVisibility = () => {
+      if (document.hidden && joined) {
+        fetch(apiUrl("/api/music/leave"), { method: "POST", keepalive: true });
+        setJoined(false);
+      }
+    };
     window.addEventListener("beforeunload", leave);
-    return () => window.removeEventListener("beforeunload", leave);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [joined]);
 
   const api = {
