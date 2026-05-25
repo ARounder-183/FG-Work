@@ -103,7 +103,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || messages.length === 0) return;
     if (isFirstLoad.current) {
       el.scrollTop = el.scrollHeight;
       isFirstLoad.current = false;
