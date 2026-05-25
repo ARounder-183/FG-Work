@@ -19,11 +19,20 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [ttsVolume, setTtsVolume] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("tts-volume");
+      if (saved) return Number(saved);
+    }
+    return 0.8;
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFirstLoad = useRef(true);
   const seenIds = useRef(new Set<string>());
   const isSpeaking = useRef(false);
   const speakQueue = useRef<string[]>([]);
+  const ttsVolumeRef = useRef(ttsVolume);
+  ttsVolumeRef.current = ttsVolume;
 
   const fetchMessages = async () => {
     const res = await fetch(apiUrl("/api/chat"));
@@ -43,7 +52,7 @@ export function ChatPanel() {
     newMsgs.forEach((m) => seenIds.current.add(m.id));
 
     if (newMsgs.length > 0) {
-      const texts = newMsgs.map((m) => `${m.user.username}说<break time="300ms"/>${m.content}`);
+      const texts = newMsgs.map((m) => `${m.user.username}：${m.content}`);
       speakQueue.current.push(...texts);
       drainSpeakQueue();
     }
@@ -77,7 +86,7 @@ export function ChatPanel() {
           if (!blob) { resolve(); return; }
           const url = URL.createObjectURL(blob);
           const audio = new Audio(url);
-          audio.volume = 0.8;
+          audio.volume = ttsVolumeRef.current;
           audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
           audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
           audio.play().catch(() => { URL.revokeObjectURL(url); resolve(); });
@@ -123,8 +132,24 @@ export function ChatPanel() {
   return (
     <div className="flex h-64 flex-col rounded-lg border bg-card">
       {/* Header */}
-      <div className="border-b px-3 py-1.5">
+      <div className="flex items-center justify-between border-b px-3 py-1.5">
         <span className="text-xs font-medium text-muted-foreground">聊天</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">🔊</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={ttsVolume}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setTtsVolume(v);
+              localStorage.setItem("tts-volume", String(v));
+            }}
+            className="h-1 w-12 cursor-pointer accent-primary"
+          />
+        </div>
       </div>
 
       {/* Messages */}

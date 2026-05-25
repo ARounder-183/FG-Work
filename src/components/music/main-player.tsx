@@ -31,7 +31,13 @@ function getAudio(): HTMLAudioElement {
 
 export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
   const [position, setPosition] = useState(0);
-  const [volume, setVolume] = useState(0.7);
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("music-volume");
+      if (saved) return Number(saved);
+    }
+    return 0.7;
+  });
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [lyric, setLyric] = useState<string | null>(null);
   const [currentLine, setCurrentLine] = useState("");
@@ -206,7 +212,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
             )}
             <div className="flex items-center gap-1">
               <span className="text-xs">🔊</span>
-              <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=>setVolume(Number(e.target.value))} className="h-1 w-16 cursor-pointer accent-primary" />
+              <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e => { const v = Number(e.target.value); setVolume(v); localStorage.setItem("music-volume", String(v)); }} className="h-1 w-16 cursor-pointer accent-primary" />
             </div>
           </div>
         </div>

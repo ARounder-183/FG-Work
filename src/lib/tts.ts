@@ -67,7 +67,6 @@ export async function synthesizeSpeech(opts: TtsOptions): Promise<Buffer | null>
             volume,
             pitch: 50,
             tte: "UTF8",
-            ttp: "cssml",
           },
           data: {
             status: 2,
