@@ -21,11 +21,69 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFirstLoad = useRef(true);
+  const seenIds = useRef(new Set<string>());
+  const isSpeaking = useRef(false);
+  const speakQueue = useRef<string[]>([]);
 
   const fetchMessages = async () => {
     const res = await fetch(apiUrl("/api/chat"));
     const data = await res.json();
-    setMessages(data.messages || []);
+    const msgs: ChatMsg[] = data.messages || [];
+    setMessages(msgs);
+
+    // First load: mark all as seen, don't speak
+    if (isFirstLoad.current) {
+      msgs.forEach((m) => seenIds.current.add(m.id));
+      isFirstLoad.current = false;
+      return;
+    }
+
+    // Detect new messages
+    const newMsgs = msgs.filter((m) => !seenIds.current.has(m.id));
+    newMsgs.forEach((m) => seenIds.current.add(m.id));
+
+    if (newMsgs.length > 0) {
+      const texts = newMsgs.map((m) => `${m.user.username}说<break time="300ms"/>${m.content}`);
+      speakQueue.current.push(...texts);
+      drainSpeakQueue();
+    }
+  };
+
+  const drainSpeakQueue = async () => {
+    if (isSpeaking.current) return;
+    isSpeaking.current = true;
+    try {
+      while (speakQueue.current.length > 0) {
+        const text = speakQueue.current.shift()!;
+        await speakText(text);
+      }
+    } finally {
+      isSpeaking.current = false;
+    }
+  };
+
+  const speakText = (text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      fetch(apiUrl("/api/chat/tts"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      })
+        .then((r) => {
+          if (!r.ok) { resolve(); return null; }
+          return r.blob();
+        })
+        .then((blob) => {
+          if (!blob) { resolve(); return; }
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.volume = 0.8;
+          audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.play().catch(() => { URL.revokeObjectURL(url); resolve(); });
+        })
+        .catch(() => resolve());
+    });
   };
 
   useEffect(() => {
@@ -40,7 +98,6 @@ export function ChatPanel() {
     if (isFirstLoad.current || el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
       el.scrollTop = el.scrollHeight;
     }
-    if (messages.length > 0) isFirstLoad.current = false;
   }, [messages]);
 
   const scrollToBottom = () => {
