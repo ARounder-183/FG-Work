@@ -43,8 +43,11 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
   const [currentLine, setCurrentLine] = useState("");
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
+  const serverPositionRef = useRef(serverPosition);
+  serverPositionRef.current = serverPosition;
   const endedRetries = useRef(0);
   const errorRetries = useRef(0);
+  const seekFailCount = useRef(0);
 
   // ── Audio event listeners ──────────────────────────────────────────
   useEffect(() => {
@@ -130,7 +133,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
           } else {
             singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
           }
-          singletonAudio.currentTime = 0;
+          singletonAudio.currentTime = serverPositionRef.current || 0;
           if (isPlaying) singletonAudio.play().catch(() => {});
         }
         // If no URL: server timer will advance. Client silently waits for next poll.
@@ -184,23 +187,30 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
     return () => a.removeEventListener("timeupdate", update);
   }, [lyric]);
 
-  // ── Progress sync (all clients follow server) ──────────────────────
-  const seekFailCount = useRef(0);
+  // ── Progress sync (server is single source of truth) ───────────────
+  // Seek to server position when drift exceeds 1.5s.
+  // Verification is deferred because seeking completes asynchronously.
   useEffect(() => {
     const a = getAudio();
     if (!a.src) return;
     const drift = Math.abs(a.currentTime - serverPosition);
-    if (drift > 2 && seekFailCount.current < 5) {
+    if (drift > 1.5 && seekFailCount.current < 10) {
       a.currentTime = serverPosition;
-      // Verify seek worked — streaming sources may silently reject seek
-      if (Math.abs(a.currentTime - serverPosition) > 1) {
-        seekFailCount.current++;
-      }
+      // Deferred check — browser may need a frame to actually apply the seek
+      const serverAtCall = serverPosition;
+      setTimeout(() => {
+        if (Math.abs(a.currentTime - serverAtCall) > 3) {
+          seekFailCount.current++;
+        }
+      }, 600);
     }
   }, [serverPosition]);
 
   const dur = currentSong?.duration || 0;
-  const pct = dur > 0 ? Math.min((position / dur) * 100, 100) : 0;
+  // Progress bar: server position is authoritative.
+  // CSS transition (duration-1000) smoothly bridges 2s polling gaps.
+  const barPos = serverPosition || position;
+  const pct = dur > 0 ? Math.min((barPos / dur) * 100, 100) : 0;
 
   return (
     <div className="flex w-full max-w-lg flex-col items-center space-y-4">
@@ -241,7 +251,7 @@ export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPo
               <div className="h-full rounded-full bg-primary transition-all duration-1000" style={{width:`${pct}%`}} />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{fmt(position)}</span><span>{fmtTotal(dur)}</span>
+              <span>{fmt(barPos)}</span><span>{fmtTotal(dur)}</span>
             </div>
           </div>
 

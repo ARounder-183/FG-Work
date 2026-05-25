@@ -65,7 +65,7 @@ export default function MusicPage() {
   }, [user]);
 
   useEffect(() => { fetchState(); fetchMySongs(); }, [fetchState, fetchMySongs]);
-  useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 2000); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
+  useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 1500); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
 
   // Check Bilibili login status
   useEffect(() => {
