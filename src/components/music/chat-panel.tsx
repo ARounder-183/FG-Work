@@ -52,7 +52,7 @@ export function ChatPanel() {
     newMsgs.forEach((m) => seenIds.current.add(m.id));
 
     if (newMsgs.length > 0) {
-      const texts = newMsgs.map((m) => `${m.user.username}：${m.content}`);
+      const texts = newMsgs.map((m) => `${m.user.username}说：${m.content}`);
       speakQueue.current.push(...texts);
       drainSpeakQueue();
     }
