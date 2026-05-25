@@ -30,7 +30,7 @@ export function BilibiliLogin({ open, onClose, onLoginSuccess }: Props) {
       .then((d) => {
         if (d.url && d.qrcodeKey) {
           setQrKey(d.qrcodeKey);
-          setQrDataUrl(`/api/bilibili/login/qrimg?url=${encodeURIComponent(d.url)}`);
+          setQrDataUrl(apiUrl(`/api/bilibili/login/qrimg?url=${encodeURIComponent(d.url)}`));
           setStatus("waiting");
         } else {
           setError(d.error || "生成二维码失败");
@@ -82,7 +82,7 @@ export function BilibiliLogin({ open, onClose, onLoginSuccess }: Props) {
       .then((d) => {
         if (d.url && d.qrcodeKey) {
           setQrKey(d.qrcodeKey);
-          setQrDataUrl(`/api/bilibili/login/qrimg?url=${encodeURIComponent(d.url)}`);
+          setQrDataUrl(apiUrl(`/api/bilibili/login/qrimg?url=${encodeURIComponent(d.url)}`));
           setStatus("waiting");
         } else {
           setError(d.error || "生成失败");
