@@ -21,14 +21,32 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const tokenRef = useRef<string>("");
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const captchaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setStep("phone");
     setTel(""); setSmsCode(""); setCaptchaKey(null);
     setSending(false); setLogging(false); setCountdown(0); setError(null);
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      clearCaptchaTimeout();
+    };
   }, [open]);
+
+  // 超时兜底：防止验证码 SDK 回调永不触发导致页面卡死
+  function startCaptchaTimeout() {
+    if (captchaTimerRef.current) clearTimeout(captchaTimerRef.current);
+    captchaTimerRef.current = setTimeout(() => {
+      console.warn("[phone] captcha timeout — SDK callback never fired");
+      setSending(false);
+      setError("验证超时，请重试");
+    }, 15000);
+  }
+
+  function clearCaptchaTimeout() {
+    if (captchaTimerRef.current) { clearTimeout(captchaTimerRef.current); captchaTimerRef.current = null; }
+  }
 
   async function handleSendSms() {
     if (!tel || tel.length < 11) { toast.error("请输入正确的手机号"); return; }
@@ -41,27 +59,30 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
       if (!d.token) { setSending(false); setError("获取验证码失败"); return; }
       tokenRef.current = d.token;
 
-      if (d.tencent?.appid) {
-        showTCaptcha(d.tencent.appid);
-      } else if (d.geetest?.gt && d.geetest?.challenge) {
+      // geetest 优先（无域名限制，第三方应用可用），TCaptcha 兜底（绑定 bilibili.com 域名）
+      if (d.geetest?.gt && d.geetest?.challenge) {
         showGeetest(d.geetest.gt, d.geetest.challenge);
+      } else if (d.tencent?.appid) {
+        showTCaptcha(d.tencent.appid);
       } else {
         setSending(false); setError("未获取到验证码配置");
       }
     } catch { setSending(false); setError("网络错误，请重试"); }
   }
 
-  // ═══ 腾讯防水墙 ═══
+  // ═══ 腾讯防水墙（兜底，通常有域名限制） ═══
   function showTCaptcha(appid: string) {
+    startCaptchaTimeout();
     const old = document.querySelector("script[src*='TCaptcha']");
     if (old) old.remove();
     const script = document.createElement("script");
     script.src = "https://t.captcha.qq.com/TCaptcha.js";
     script.onload = () => {
       const C = (window as any).TencentCaptcha;
-      if (!C) { setSending(false); setError("验证组件加载失败"); return; }
+      if (!C) { clearCaptchaTimeout(); setSending(false); setError("验证组件加载失败"); return; }
       new C(appid, (res: any) => {
         console.log("[tcaptcha]", res);
+        clearCaptchaTimeout();
         if (res.ret === 0 && res.ticket) {
           doSendSms(res.ticket, res.randstr || "", "");
         } else {
@@ -70,41 +91,55 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
         }
       }).show();
     };
-    script.onerror = () => { setSending(false); setError("验证组件加载失败"); };
+    script.onerror = () => { clearCaptchaTimeout(); setSending(false); setError("验证组件加载失败"); };
     document.head.appendChild(script);
   }
 
-  // ═══ geetest v3（兜底）═══
+  // ═══ geetest v3（参考 BBPlayer 实现） ═══
   function showGeetest(gt: string, challenge: string) {
+    startCaptchaTimeout();
+    // 先创建弹层容器
+    const box = document.createElement("div");
+    box.id = "gt-popup";
+    box.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)";
+    document.body.appendChild(box);
+    // 加载 geetest v3 SDK
     const old = document.querySelector("script[src*='gt.0.4.9']");
     if (old) old.remove();
     const script = document.createElement("script");
     script.src = "https://static.geetest.com/static/js/gt.0.4.9.js";
     script.onload = () => {
       const init = (window as any).initGeetest;
-      if (!init) { setSending(false); setError("验证组件加载失败"); return; }
+      if (!init) { cleanupGeetest(); clearCaptchaTimeout(); setSending(false); setError("验证组件加载失败"); return; }
       try {
-        init({ gt, challenge, product: "bind", offline: false, new_captcha: true }, (obj: any) => {
-          obj.onReady(() => {
-            const box = document.createElement("div");
-            box.id = "gt-popup";
-            box.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)";
-            document.body.appendChild(box);
-            obj.appendTo(box);
-            setTimeout(() => { const b = box.querySelector("button"); if (b) (b as HTMLElement).click(); }, 300);
-          });
+        // 参数完全匹配 BBPlayer
+        init({
+          gt,
+          challenge,
+          offline: false,
+          new_captcha: true,
+          product: "popup",
+          https: true,
+          width: "100%",
+        }, (obj: any) => {
+          obj.appendTo(box);
           obj.onSuccess(() => {
-            document.getElementById("gt-popup")?.remove();
+            clearCaptchaTimeout();
+            cleanupGeetest();
             const r = obj.getValidate();
             doSendSms(r.geetest_challenge, r.geetest_validate, r.geetest_seccode);
           });
-          obj.onError(() => { document.getElementById("gt-popup")?.remove(); setSending(false); setError("人机验证失败"); });
-          obj.onClose(() => { document.getElementById("gt-popup")?.remove(); setSending(false); });
+          obj.onError(() => { clearCaptchaTimeout(); cleanupGeetest(); setSending(false); setError("人机验证失败"); });
+          obj.onClose(() => { clearCaptchaTimeout(); cleanupGeetest(); setSending(false); });
         });
-      } catch { setSending(false); setError("验证失败"); }
+      } catch { clearCaptchaTimeout(); cleanupGeetest(); setSending(false); setError("验证失败"); }
     };
-    script.onerror = () => { setSending(false); setError("验证组件加载失败"); };
+    script.onerror = () => { clearCaptchaTimeout(); cleanupGeetest(); setSending(false); setError("验证组件加载失败"); };
     document.head.appendChild(script);
+  }
+
+  function cleanupGeetest() {
+    document.getElementById("gt-popup")?.remove();
   }
 
   function doSendSms(challenge: string, validate: string, seccode: string) {
