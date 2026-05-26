@@ -37,9 +37,10 @@ interface Props {
   biliUname?: string;
   onBiliLogin?: () => void;
   onPhoneLogin?: () => void;
+  onBiliLogout?: () => void;
 }
 
-export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs, biliLoggedIn, biliUname, onBiliLogin, onPhoneLogin }: Props) {
+export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs, biliLoggedIn, biliUname, onBiliLogin, onPhoneLogin, onBiliLogout }: Props) {
   const [searchOpen, setSearchOpen] = useState(true);
   const [myOpen, setMyOpen] = useState(true);
   const [source, setSource] = useState<"ncm" | "bilibili">("ncm");
@@ -264,28 +265,40 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
               {/* Bilibili login bar */}
               <div className="flex items-center justify-between border-b px-2.5 py-1">
                 {biliLoggedIn ? (
-                  <span className="text-[10px] text-muted-foreground">👤 {biliUname || "已登录B站"}</span>
+                  <>
+                    <span className="text-[10px] text-muted-foreground">👤 {biliUname || "已登录B站"}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 text-[9px] text-destructive hover:text-destructive"
+                      onClick={onBiliLogout}
+                    >
+                      退出
+                    </Button>
+                  </>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">🔐 未登录</span>
+                  <>
+                    <span className="text-[10px] text-muted-foreground">🔐 B站未登录</span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-5 text-[9px]"
+                        onClick={onBiliLogin}
+                      >
+                        扫码
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-5 text-[9px]"
+                        onClick={onPhoneLogin}
+                      >
+                        短信登录
+                      </Button>
+                    </div>
+                  </>
                 )}
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant={biliLoggedIn ? "ghost" : "outline"}
-                    className="h-5 text-[9px]"
-                    onClick={onBiliLogin}
-                  >
-                    {biliLoggedIn ? "切换" : "扫码"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={biliLoggedIn ? "ghost" : "outline"}
-                    className="h-5 text-[9px]"
-                    onClick={onPhoneLogin}
-                  >
-                    短信
-                  </Button>
-                </div>
               </div>
             <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
               <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">

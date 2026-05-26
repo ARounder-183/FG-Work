@@ -185,6 +185,14 @@ export default function MusicPage() {
         biliUname={biliUname}
         onBiliLogin={() => setLoginOpen(true)}
         onPhoneLogin={() => setPhoneLoginOpen(true)}
+        onBiliLogout={async () => {
+          try {
+            await fetch(apiUrl("/api/bilibili/login/logout"), { method: "POST" });
+            setBiliLoggedIn(false);
+            setBiliUname("");
+            toast.success("已退出B站登录");
+          } catch { toast.error("退出失败"); }
+        }}
       />
     </div>
 
