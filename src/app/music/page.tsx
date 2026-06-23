@@ -4,7 +4,6 @@ import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MainPlayer } from "@/components/music/main-player";
 import { RightPanels } from "@/components/music/right-panels";
@@ -304,55 +303,26 @@ export default function MusicPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 lg:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <Skeleton className="h-9 w-28 rounded-full" />
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-24 rounded-full" />
-            <Skeleton className="h-9 w-24 rounded-full" />
-            <Skeleton className="h-9 w-24 rounded-full" />
-          </div>
-        </div>
-        <Skeleton className="h-[34rem] w-full rounded-[32px]" />
+      <div className="flex-1 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.14),transparent_22%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.1),transparent_28%),linear-gradient(180deg,#08111f_0%,#020617_100%)] px-4 py-4 lg:px-6">
+        <Skeleton className="mx-auto h-[calc(100vh-5.5rem)] w-full max-w-[1600px] rounded-[32px] bg-white/10" />
       </div>
     );
   }
 
   return (
     <>
-      <div className="flex-1 bg-muted/20">
-        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={joined ? "default" : "outline"}>{joined ? "已加入" : "未加入"}</Badge>
-              <Badge variant="outline">{activeUsers.length} 人</Badge>
-              <Badge variant="outline">{mySongs.length} 首</Badge>
-              {currentSong ? <Badge variant="secondary">{isPlaying ? "播放中" : "暂停中"}</Badge> : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {!joined ? (
-                <Button onClick={api.join} disabled={!user}>
-                  {user ? "加入音乐室" : "登录后加入"}
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={api.leave}>
-                  离开房间
-                </Button>
-              )}
-              <Button variant={chatOpen ? "secondary" : "outline"} onClick={() => setChatOpen((prev) => !prev)}>
-                {chatOpen ? "收起消息" : "房间消息"}
-              </Button>
-              <Button variant={libraryOpen ? "secondary" : "outline"} onClick={() => setLibraryOpen((prev) => !prev)}>
-                {libraryOpen ? "收起歌单" : "歌单"}
-              </Button>
-            </div>
-          </div>
-
+      <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.16),transparent_24%),radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.12),transparent_26%),linear-gradient(180deg,#08111f_0%,#020617_100%)]">
+        <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-[1600px] flex-col px-4 py-4 lg:px-6">
           <MainPlayer
+            joined={joined}
+            canJoin={Boolean(user)}
+            mySongCount={mySongs.length}
             currentSong={joined ? currentSong : null}
             isPlaying={joined ? isPlaying : false}
             isCurrentUserSong={currentUserSong?.userId === user?.id}
             serverPosition={serverPosition}
+            onJoinRoom={api.join}
+            onLeaveRoom={api.leave}
             onSkipVote={api.skipVote}
             onForceSkip={api.forceSkip}
             skipVotes={skipVotes.length}
@@ -365,16 +335,27 @@ export default function MusicPage() {
         </div>
 
         <div
-          className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${libraryOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          className={`fixed inset-0 z-40 bg-slate-950/28 transition-opacity duration-300 ${libraryOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
           onClick={() => setLibraryOpen(false)}
         />
 
-        <aside
-          className={`fixed right-0 top-14 z-50 h-[calc(100vh-3.5rem)] w-full max-w-[64rem] transition-transform duration-300 ${libraryOpen ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+        <button
+          type="button"
+          aria-label={libraryOpen ? "收起歌单" : "展开歌单"}
+          className={`fixed right-0 top-1/2 z-50 flex h-28 w-11 -translate-y-1/2 items-center justify-center rounded-l-2xl border border-r-0 border-white/10 backdrop-blur transition-colors ${libraryOpen ? "bg-white/18 text-white" : "bg-slate-950/72 text-white/82 hover:bg-slate-950/84"}`}
+          onClick={() => setLibraryOpen((prev) => !prev)}
         >
-          <div className="flex h-full flex-col border-l border-border/60 bg-background shadow-2xl">
+          <span className="[writing-mode:vertical-rl] rotate-180 text-xs font-medium tracking-[0.28em]">
+            {libraryOpen ? "收起歌单" : "歌单"}
+          </span>
+        </button>
+
+        <aside
+          className={`fixed right-0 top-14 z-50 h-[calc(100vh-4.5rem)] w-[min(22rem,88vw)] transition-transform duration-300 lg:w-[min(24rem,26vw)] ${libraryOpen ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+        >
+          <div className="flex h-full flex-col overflow-hidden rounded-l-[28px] border border-r-0 border-white/10 bg-background/96 shadow-2xl backdrop-blur">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
-              <div className="text-lg font-semibold">歌单</div>
+              <div className="text-base font-semibold">歌单</div>
               <Button variant="ghost" size="sm" onClick={() => setLibraryOpen(false)}>
                 关闭
               </Button>
@@ -408,11 +389,19 @@ export default function MusicPage() {
           </div>
         </aside>
 
+        <Button
+          className="fixed bottom-3 left-3 z-50 rounded-full border border-white/12 bg-slate-950/78 px-4 text-white shadow-lg backdrop-blur hover:bg-slate-950/86"
+          variant="ghost"
+          onClick={() => setChatOpen((prev) => !prev)}
+        >
+          {chatOpen ? "收起消息" : "房间消息"}
+        </Button>
+
         <div
-          className={`fixed bottom-4 left-4 z-40 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-2xl transition-all duration-300 ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0"}`}
+          className={`fixed bottom-16 left-3 z-40 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] border border-white/10 bg-background/96 shadow-2xl backdrop-blur transition-all duration-300 sm:w-[22rem] ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-5 opacity-0"}`}
         >
           <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
-            <div className="text-lg font-semibold">房间消息</div>
+            <div className="text-base font-semibold">房间消息</div>
             <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)}>
               关闭
             </Button>

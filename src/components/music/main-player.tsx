@@ -3,7 +3,6 @@
 import { apiUrl, proxyImage } from "@/lib/url";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface Song {
@@ -34,10 +33,15 @@ interface UpcomingSong {
 }
 
 interface Props {
+  joined: boolean;
+  canJoin: boolean;
+  mySongCount: number;
   currentSong: Song | null;
   isPlaying: boolean;
   isCurrentUserSong: boolean;
   serverPosition: number;
+  onJoinRoom: () => void;
+  onLeaveRoom: () => void;
   onSkipVote: () => void;
   onForceSkip: () => void;
   skipVotes: number;
@@ -136,10 +140,15 @@ function isAbortError(error: unknown) {
 }
 
 export function MainPlayer({
+  joined,
+  canJoin,
+  mySongCount,
   currentSong,
   isPlaying,
   isCurrentUserSong,
   serverPosition,
+  onJoinRoom,
+  onLeaveRoom,
   onSkipVote,
   onForceSkip,
   skipVotes,
@@ -443,154 +452,171 @@ export function MainPlayer({
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <div className="space-y-4 pb-24">
-      <div className="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.2),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_24%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[32px] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.22),transparent_26%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.12),transparent_26%)]" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/6 to-transparent" />
+
+      <div className="relative flex min-h-0 flex-1 flex-col px-4 pb-5 pt-4 sm:px-6 sm:pb-6 lg:px-8 lg:pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-3">
+            {activeUsers.length > 0 ? (
+              activeUsers.map((user) => {
+                const isCurrent = user.id === currentUserId;
+                return (
+                  <div key={user.id} className="flex min-w-0 items-center gap-2.5">
+                    <div className="relative shrink-0">
+                      <Avatar className={`h-10 w-10 border border-white/12 ${isCurrent ? "ring-2 ring-amber-300/85 ring-offset-2 ring-offset-[#08111f]" : ""}`}>
+                        <AvatarImage src={user.avatar || ""} />
+                        <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      {isCurrent ? <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.85)]" /> : null}
+                    </div>
+                    <span className={`max-w-[7rem] truncate text-sm ${isCurrent ? "font-medium text-white" : "text-white/72"}`}>
+                      {user.username}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <span className="text-sm text-white/58">房间里还没有成员</span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs text-white/72">
+              {activeUsers.length} 人
+            </span>
+            <span className="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs text-white/72">
+              我的歌单 {mySongCount}
+            </span>
+            {currentSong ? (
+              <span className="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs text-white/72">
+                {isPlaying ? "播放中" : "暂停中"}
+              </span>
+            ) : null}
+            {joined ? (
+              <Button variant="outline" onClick={onLeaveRoom} className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white">
+                离开房间
+              </Button>
+            ) : (
+              <Button onClick={onJoinRoom} disabled={!canJoin} className="bg-white text-slate-950 hover:bg-white/90">
+                {canJoin ? "加入音乐室" : "登录后加入"}
+              </Button>
+            )}
+          </div>
+        </div>
+
         {currentSong ? (
-          <div className="grid gap-5 p-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-white text-slate-950 hover:bg-white">{isPlaying ? "正在同步播放" : "暂停中"}</Badge>
-                <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">
-                  {sourceLabel}
-                </Badge>
-              </div>
-
-              <div className="overflow-hidden rounded-[20px] border border-white/10 bg-white/5">
-                <div className="aspect-square">
-                  {coverUrl ? (
-                    <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-5xl">🎵</div>
-                  )}
+          <>
+            <div className="grid min-h-0 flex-1 gap-8 pt-8 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-center">
+              <div className="mx-auto flex w-full max-w-[19rem] flex-col gap-5">
+                <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/6 shadow-[0_28px_80px_rgba(0,0,0,0.36)] backdrop-blur-sm">
+                  <div className="aspect-square">
+                    {coverUrl ? (
+                      <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-white/6 text-6xl">♪</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="min-w-0 space-y-5">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">{activeUsers.length} 人在线</Badge>
-                  {songSubmittedBy ? (
-                    <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">
-                      点歌人 {songSubmittedBy.username}
-                    </Badge>
-                  ) : null}
-                </div>
-                <div className="min-w-0">
-                  <h2 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">{currentSong.name}</h2>
-                  <p className="mt-2 truncate text-base text-white/80">{currentSong.artists}</p>
-                  <p className="mt-1 truncate text-sm text-white/55">{currentSong.album}</p>
+                <div className="flex items-center justify-between gap-3 text-xs text-white/58">
+                  <span>{sourceLabel}</span>
+                  <span>{songSubmittedBy ? `点歌人 ${songSubmittedBy.username}` : ""}</span>
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between text-xs text-white/60">
-                  <span>播放进度</span>
-                  <span className="font-mono tabular-nums">{fmt(progressPosition)} / {fmtTotal(duration)}</span>
+              <div className="flex min-h-0 flex-col justify-center gap-6">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-white/58">
+                    {joined ? <span>已加入房间</span> : <span>旁听中</span>}
+                    {songSubmittedBy ? <span className="h-1 w-1 rounded-full bg-white/35" /> : null}
+                    {songSubmittedBy ? <span>{songSubmittedBy.username}</span> : null}
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">{currentSong.name}</h1>
+                    <p className="mt-3 text-base text-white/78 sm:text-lg">{currentSong.artists}</p>
+                    <p className="mt-1 text-sm text-white/48">{currentSong.album}</p>
+                  </div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-amber-400 transition-all duration-700" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-                <div className="rounded-[18px] border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs text-white/60">当前歌词</p>
-                  <p className="mt-3 min-h-[4.5rem] break-words text-base leading-7 text-white/88">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 text-sm text-white/62">
+                    <span>{fmt(progressPosition)}</span>
+                    <span>{fmtTotal(duration)}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-sky-300 transition-all duration-700" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] border border-white/10 bg-black/18 px-5 py-5 backdrop-blur-sm">
+                  <p className="text-sm leading-8 text-white/88 sm:text-lg sm:leading-9">
                     {currentLine || "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
                   </p>
                 </div>
 
-                <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
-                    <div className="text-xs text-white/60">音量</div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-xs text-white/55">静</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={volume}
-                        onChange={(event) => {
-                          const nextVolume = Number(event.target.value);
-                          setVolume(nextVolume);
-                          localStorage.setItem("music-volume", String(nextVolume));
-                        }}
-                        className="h-1.5 flex-1 cursor-pointer accent-amber-300"
-                      />
-                      <span className="text-xs text-white/55">强</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-950">
-                      投票切歌 {skipVotes}/{skipThreshold}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button size="lg" onClick={onSkipVote} className="bg-white text-slate-950 hover:bg-white/90">
+                    投票切歌 {skipVotes}/{skipThreshold}
+                  </Button>
+                  {isCurrentUserSong ? (
+                    <Button size="lg" variant="outline" onClick={onForceSkip} className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white">
+                      直接跳过
                     </Button>
-                    {isCurrentUserSong ? (
-                      <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/14 bg-transparent text-white">
-                        直接跳过
-                      </Button>
-                    ) : null}
+                  ) : null}
+                  <div className="ml-auto flex min-w-[14rem] items-center gap-3 rounded-full border border-white/10 bg-black/18 px-4 py-3 text-sm text-white/72 backdrop-blur-sm">
+                    <span className="shrink-0 text-xs text-white/50">音量</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={volume}
+                      onChange={(event) => {
+                        const nextVolume = Number(event.target.value);
+                        setVolume(nextVolume);
+                        localStorage.setItem("music-volume", String(nextVolume));
+                      }}
+                      className="h-1.5 flex-1 cursor-pointer accent-amber-300"
+                    />
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+
+            {upcomingSongs.length > 0 ? (
+              <div className="grid gap-2 pt-6 sm:grid-cols-2 xl:grid-cols-5">
+                {upcomingSongs.map((song, index) => (
+                  <div key={song.id} className={`rounded-2xl border px-3 py-3 backdrop-blur-sm ${song.isCurrent ? "border-amber-300/30 bg-white/10" : "border-white/10 bg-white/6"}`}>
+                    <div className="text-[11px] uppercase tracking-[0.2em] text-white/38">{String(index + 1).padStart(2, "0")}</div>
+                    <div className="mt-2 truncate text-sm font-medium text-white">{song.name}</div>
+                    <div className="truncate text-xs text-white/55">{song.artists}</div>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-white/46">
+                      <span className="truncate">{song.userName}</span>
+                      <span>{song.duration}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : (
-          <div className="flex min-h-[22rem] flex-col items-center justify-center px-6 py-12 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-4xl">🎧</div>
-            <p className="mt-5 text-xl font-semibold text-white">房间里还没有歌曲。</p>
-            <p className="mt-3 max-w-md text-sm leading-6 text-white/60">先去右侧加歌，播放完会自动移到队尾。</p>
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/6 text-5xl shadow-[0_20px_50px_rgba(0,0,0,0.28)]">♪</div>
+            <h1 className="mt-6 text-3xl font-semibold tracking-tight text-white">还没有正在播放的歌</h1>
+            <p className="mt-3 max-w-md text-sm leading-7 text-white/58">
+              从右侧歌单加歌，房间会按顺序接力播放，播完后自动移到队尾。
+            </p>
+            {!joined ? (
+              <Button onClick={onJoinRoom} disabled={!canJoin} className="mt-6 bg-white text-slate-950 hover:bg-white/90">
+                {canJoin ? "加入音乐室" : "登录后加入"}
+              </Button>
+            ) : null}
           </div>
         )}
       </div>
-
-      <div className="rounded-[22px] border border-border/60 bg-background/92 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          {activeUsers.length > 0 ? (
-            activeUsers.map((user) => {
-              const isCurrent = user.id === currentUserId;
-              return (
-                <div
-                  key={user.id}
-                  className={`group relative flex items-center gap-2 rounded-full border px-2.5 py-2 ${
-                    isCurrent ? "border-primary/35 bg-primary/8 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]" : "border-border/60 bg-muted/20"
-                  }`}
-                >
-                  <Avatar className={`h-10 w-10 ${isCurrent ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}>
-                    <AvatarImage src={user.avatar || ""} />
-                    <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  {isCurrent ? <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary shadow-[0_0_16px_rgba(59,130,246,0.7)]" /> : null}
-                  <span className="max-w-[6rem] truncate text-sm font-medium text-foreground">{user.username}</span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-sm text-muted-foreground">
-              还没有人在房间里，先加入再说。
-            </div>
-          )}
-        </div>
-
-        {upcomingSongs.length > 0 ? (
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            {upcomingSongs.map((song, index) => (
-              <div key={song.id} className={`rounded-2xl border px-3 py-3 ${song.isCurrent ? "border-primary/35 bg-primary/8" : "border-border/60 bg-muted/20"}`}>
-                <div className="text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div>
-                <div className="mt-2 truncate text-sm font-medium">{song.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{song.artists}</div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span className="truncate">{song.userName}</span>
-                  <span>{song.duration}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    </section>
   );
 }
 
