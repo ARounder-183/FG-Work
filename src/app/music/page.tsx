@@ -42,48 +42,6 @@ interface CurrentUserSong {
   user: { username: string; avatar: string | null };
 }
 
-interface QueueItem {
-  id: string;
-  songData: string;
-  userId: string;
-  user: { username: string; avatar: string | null };
-}
-
-function parseSong(raw: string): Song | null {
-  try {
-    return JSON.parse(raw) as Song;
-  } catch {
-    return null;
-  }
-}
-
-function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remain = Math.floor(seconds % 60);
-  return `${minutes}:${String(remain).padStart(2, "0")}`;
-}
-
-function queuePreview(fullQueue: QueueItem[], currentSong: Song | null) {
-  const seen = new Set<string>();
-
-  return fullQueue
-    .filter((item) => {
-      if (seen.has(item.userId)) return false;
-      seen.add(item.userId);
-      return true;
-    })
-    .map((item) => {
-      const song = parseSong(item.songData);
-      const isCurrent = song
-        ? song.source === "bilibili"
-          ? song.bvid === currentSong?.bvid
-          : song.id === currentSong?.id
-        : false;
-
-      return { item, song, isCurrent };
-    });
-}
-
 export default function MusicPage() {
   const { user } = useAuth();
   const [joined, setJoined] = useState(false);
@@ -94,7 +52,6 @@ export default function MusicPage() {
   const [skipVotes, setSkipVotes] = useState<string[]>([]);
   const [skipThreshold, setSkipThreshold] = useState(1);
   const [currentUserSong, setCurrentUserSong] = useState<CurrentUserSong | null>(null);
-  const [fullQueue, setFullQueue] = useState<QueueItem[]>([]);
   const [serverPosition, setServerPosition] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -102,6 +59,7 @@ export default function MusicPage() {
   const [biliLoggedIn, setBiliLoggedIn] = useState(false);
   const [biliUname, setBiliUname] = useState("");
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
   const fetchMySongs = useCallback(async () => {
@@ -127,7 +85,6 @@ export default function MusicPage() {
         setSkipVotes(data.skipVotes || []);
         setSkipThreshold(data.skipThreshold || 1);
         setCurrentUserSong(data.currentUserSong || null);
-        setFullQueue(data.fullQueue || []);
         setServerPosition(data.state?.position || 0);
       }
 
@@ -291,28 +248,18 @@ export default function MusicPage() {
     },
   };
 
-  const nextSongs = queuePreview(fullQueue, currentSong);
-  const upcomingSongs = nextSongs.slice(0, 5).map(({ item, song, isCurrent }) => ({
-    id: item.id,
-    name: song?.name || "解析失败的歌曲",
-    artists: song?.artists || "未知作者",
-    userName: item.user.username,
-    duration: song ? formatDuration(song.duration) : "--:--",
-    isCurrent,
-  }));
-
   if (loading) {
     return (
-      <div className="flex-1 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.14),transparent_22%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.1),transparent_28%),linear-gradient(180deg,#08111f_0%,#020617_100%)] px-4 py-4 lg:px-6">
-        <Skeleton className="mx-auto h-[calc(100vh-5.5rem)] w-full max-w-[1600px] rounded-[32px] bg-white/10" />
+      <div className="flex-1">
+        <Skeleton className="h-[calc(100vh-3.5rem)] w-full bg-foreground/10" />
       </div>
     );
   }
 
   return (
     <>
-      <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.16),transparent_24%),radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.12),transparent_26%),linear-gradient(180deg,#08111f_0%,#020617_100%)]">
-        <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-[1600px] flex-col px-4 py-4 lg:px-6">
+      <div className="relative flex-1 overflow-hidden">
+        <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col">
           <MainPlayer
             joined={joined}
             canJoin={Boolean(user)}
@@ -330,33 +277,35 @@ export default function MusicPage() {
             activeUsers={activeUsers}
             currentUserId={currentUserSong?.userId || null}
             songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
-            upcomingSongs={upcomingSongs}
           />
         </div>
 
         <div
-          className={`fixed inset-0 z-40 bg-slate-950/28 transition-opacity duration-300 ${libraryOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-          onClick={() => setLibraryOpen(false)}
+          className={`fixed inset-0 z-40 bg-slate-950/28 transition-opacity duration-500 ease-out ${libraryOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={() => {
+            setLibraryOpen(false);
+            setSearchOpen(false);
+          }}
         />
 
         <button
           type="button"
           aria-label={libraryOpen ? "收起歌单" : "展开歌单"}
-          className={`fixed right-0 top-1/2 z-50 flex h-28 w-11 -translate-y-1/2 items-center justify-center rounded-l-2xl border border-r-0 border-white/10 backdrop-blur transition-colors ${libraryOpen ? "bg-white/18 text-white" : "bg-slate-950/72 text-white/82 hover:bg-slate-950/84"}`}
+          className={`fixed right-0 top-1/2 z-50 flex h-28 w-11 -translate-y-1/2 items-center justify-center rounded-l-2xl border border-r-0 border-border backdrop-blur transition-colors ${libraryOpen ? "bg-accent text-accent-foreground" : "bg-background/85 text-foreground hover:bg-background"}`}
           onClick={() => setLibraryOpen((prev) => !prev)}
         >
-          <span className="[writing-mode:vertical-rl] rotate-180 text-xs font-medium tracking-[0.28em]">
+          <span className="[writing-mode:vertical-rl] text-xs font-medium tracking-[0.28em]">
             {libraryOpen ? "收起歌单" : "歌单"}
           </span>
         </button>
 
         <aside
-          className={`fixed right-0 top-14 z-50 h-[calc(100vh-4.5rem)] w-[min(22rem,88vw)] transition-transform duration-300 lg:w-[min(24rem,26vw)] ${libraryOpen ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+          className={`fixed right-0 top-14 z-50 h-[calc(100vh-3.5rem)] transition-[transform,width,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0.21,1)] ${searchOpen ? "w-[min(44rem,90vw)] lg:w-[min(48rem,52vw)]" : "w-[min(22rem,88vw)] lg:w-[min(24rem,26vw)]"} ${libraryOpen ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-full opacity-0"}`}
         >
-          <div className="flex h-full flex-col overflow-hidden rounded-l-[28px] border border-r-0 border-white/10 bg-background/96 shadow-2xl backdrop-blur">
+          <div className="flex h-full flex-col overflow-hidden border border-r-0 border-border bg-background shadow-2xl backdrop-blur">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
               <div className="text-base font-semibold">歌单</div>
-              <Button variant="ghost" size="sm" onClick={() => setLibraryOpen(false)}>
+              <Button variant="ghost" size="sm" onClick={() => { setLibraryOpen(false); setSearchOpen(false); }}>
                 关闭
               </Button>
             </div>
@@ -384,13 +333,15 @@ export default function MusicPage() {
                     toast.error("退出失败");
                   }
                 }}
+                searchOpen={searchOpen}
+                onToggleSearch={() => setSearchOpen((prev) => !prev)}
               />
             </div>
           </div>
         </aside>
 
         <Button
-          className="fixed bottom-3 left-3 z-50 rounded-full border border-white/12 bg-slate-950/78 px-4 text-white shadow-lg backdrop-blur hover:bg-slate-950/86"
+          className="fixed bottom-3 left-3 z-50 rounded-full border border-border bg-background/85 px-4 text-foreground shadow-lg backdrop-blur hover:bg-background"
           variant="ghost"
           onClick={() => setChatOpen((prev) => !prev)}
         >
@@ -398,7 +349,7 @@ export default function MusicPage() {
         </Button>
 
         <div
-          className={`fixed bottom-16 left-3 z-40 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] border border-white/10 bg-background/96 shadow-2xl backdrop-blur transition-all duration-300 sm:w-[22rem] ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-5 opacity-0"}`}
+          className={`fixed bottom-16 left-3 z-40 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-3xl border border-border bg-background shadow-2xl backdrop-blur transition-all duration-300 sm:w-[22rem] ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-5 opacity-0"}`}
         >
           <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
             <div className="text-base font-semibold">房间消息</div>

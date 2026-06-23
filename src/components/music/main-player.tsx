@@ -23,15 +23,6 @@ interface ActiveUser {
   avatar: string | null;
 }
 
-interface UpcomingSong {
-  id: string;
-  name: string;
-  artists: string;
-  userName: string;
-  duration: string;
-  isCurrent: boolean;
-}
-
 interface Props {
   joined: boolean;
   canJoin: boolean;
@@ -49,7 +40,6 @@ interface Props {
   activeUsers: ActiveUser[];
   currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
-  upcomingSongs?: UpcomingSong[];
 }
 
 interface MusicPlayerRuntime {
@@ -156,7 +146,6 @@ export function MainPlayer({
   activeUsers,
   currentUserId,
   songSubmittedBy,
-  upcomingSongs = [],
 }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(() => {
@@ -287,7 +276,7 @@ export function MainPlayer({
       ? `bili:${currentSong.bvid ?? currentSong.id}`
       : `ncm:${currentSong.id}`;
 
-    setCoverUrl(currentSong.source === "bilibili" ? currentSong.picUrl || null : null);
+    setCoverUrl(currentSong.picUrl || null);
     setPosition(audio.currentTime);
 
     if (runtime.lastKey === songKey) {
@@ -452,9 +441,17 @@ export function MainPlayer({
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[32px] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.22),transparent_26%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.12),transparent_26%)]" />
-      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/6 to-transparent" />
+    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-400 text-white dark:bg-slate-950 dark:bg-none">
+      {coverUrl ? (
+        <div
+          aria-hidden
+          className="fg-music-aurora-1 absolute inset-0 scale-110 bg-cover bg-center opacity-55 blur-3xl"
+          style={{ backgroundImage: `url(${proxyImage(coverUrl)})` }}
+        />
+      ) : null}
+      <div className="fg-music-aurora-2 absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.45),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(244,114,182,0.55),transparent_42%),radial-gradient(circle_at_30%_82%,rgba(56,189,248,0.45),transparent_44%),radial-gradient(circle_at_78%_78%,rgba(251,191,36,0.40),transparent_42%)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_30%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.14),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.10),transparent_30%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/25 to-black/45 dark:from-slate-950/55 dark:via-slate-950/65 dark:to-slate-950/90" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/15 to-transparent dark:from-white/6" />
 
       <div className="relative flex min-h-0 flex-1 flex-col px-4 pb-5 pt-4 sm:px-6 sm:pb-6 lg:px-8 lg:pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -584,22 +581,6 @@ export function MainPlayer({
                 </div>
               </div>
             </div>
-
-            {upcomingSongs.length > 0 ? (
-              <div className="grid gap-2 pt-6 sm:grid-cols-2 xl:grid-cols-5">
-                {upcomingSongs.map((song, index) => (
-                  <div key={song.id} className={`rounded-2xl border px-3 py-3 backdrop-blur-sm ${song.isCurrent ? "border-amber-300/30 bg-white/10" : "border-white/10 bg-white/6"}`}>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-white/38">{String(index + 1).padStart(2, "0")}</div>
-                    <div className="mt-2 truncate text-sm font-medium text-white">{song.name}</div>
-                    <div className="truncate text-xs text-white/55">{song.artists}</div>
-                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-white/46">
-                      <span className="truncate">{song.userName}</span>
-                      <span>{song.duration}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">

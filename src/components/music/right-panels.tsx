@@ -71,6 +71,8 @@ interface Props {
   onBiliLogin?: () => void;
   onPhoneLogin?: () => void;
   onBiliLogout?: () => void;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
 }
 
 export function RightPanels({
@@ -87,6 +89,8 @@ export function RightPanels({
   onBiliLogin,
   onPhoneLogin,
   onBiliLogout,
+  searchOpen,
+  onToggleSearch,
 }: Props) {
   const [source, setSource] = useState<"ncm" | "bilibili">("ncm");
   const [tab, setTab] = useState("song");
@@ -231,147 +235,149 @@ export function RightPanels({
   }, 0);
 
   return (
-    <div className="grid h-full min-h-0 gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
-        <div className="space-y-4 border-b border-border/60 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold">找歌</h3>
-            <div className="inline-flex rounded-full border border-border bg-muted/50 p-1">
-              <button
-                onClick={() => handleSourceChange("ncm")}
-                className={`rounded-full px-3 py-1.5 text-xs transition ${source === "ncm" ? "bg-background text-foreground" : "text-muted-foreground"}`}
-              >
-                网易云
-              </button>
-              <button
-                onClick={() => handleSourceChange("bilibili")}
-                className={`rounded-full px-3 py-1.5 text-xs transition ${source === "bilibili" ? "bg-background text-foreground" : "text-muted-foreground"}`}
-              >
-                Bilibili
-              </button>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder={source === "ncm" ? "搜单曲、歌单、播客" : "搜视频或导入收藏夹"}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && void search()}
-              className="h-10"
-            />
-            <Button onClick={() => void search()} disabled={searching} className="h-10 px-4">
-              {searching ? "搜索中" : "搜索"}
-            </Button>
-          </div>
-
-          {source === "bilibili" ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-3">
-              <div className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "B 站未登录"}</div>
-              <div className="flex gap-2">
-                {biliLoggedIn ? (
-                  <Button variant="outline" size="sm" onClick={onBiliLogout}>退出</Button>
-                ) : (
-                  <>
-                    <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
-                    <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
-                  </>
-                )}
+    <div className="flex h-full min-h-0">
+      {searchOpen ? (
+        <section className="flex h-full w-1/2 min-w-0 flex-col overflow-hidden border-r border-border/60 bg-background">
+          <div className="space-y-4 border-b border-border/60 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold">找歌</h3>
+              <div className="inline-flex rounded-full border border-border bg-muted/50 p-1">
+                <button
+                  onClick={() => handleSourceChange("ncm")}
+                  className={`rounded-full px-3 py-1.5 text-xs transition ${source === "ncm" ? "bg-background text-foreground" : "text-muted-foreground"}`}
+                >
+                  网易云
+                </button>
+                <button
+                  onClick={() => handleSourceChange("bilibili")}
+                  className={`rounded-full px-3 py-1.5 text-xs transition ${source === "bilibili" ? "bg-background text-foreground" : "text-muted-foreground"}`}
+                >
+                  Bilibili
+                </button>
               </div>
             </div>
-          ) : null}
-        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-5">
-          <Tabs value={tab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col gap-4">
-            <TabsList className={`grid w-full ${source === "ncm" ? "grid-cols-3" : "grid-cols-2"}`}>
-              {source === "ncm" ? (
-                <>
-                  <TabsTrigger value="song">单曲</TabsTrigger>
-                  <TabsTrigger value="playlist">歌单</TabsTrigger>
-                  <TabsTrigger value="dj">播客</TabsTrigger>
-                </>
-              ) : (
-                <>
-                  <TabsTrigger value="video">视频</TabsTrigger>
-                  <TabsTrigger value="fav">收藏夹</TabsTrigger>
-                </>
-              )}
-            </TabsList>
-
-            <TabsContent value="song" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
-              <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} />
-            </TabsContent>
-
-            <TabsContent value="video" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
-              <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} favHasMore={favHasMore && !!favMediaId} onLoadMoreFav={() => favMediaId && void loadFavFolder(favMediaId, true)} />
-            </TabsContent>
-
-            <TabsContent value="playlist" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
-              <PanelList
-                empty="还没有歌单结果。"
-                items={playlists.map((playlist) => ({
-                  id: playlist.id,
-                  icon: "🎵",
-                  title: playlist.name,
-                  meta: `${playlist.trackCount || "?"} 首${playlist.creator ? ` · ${playlist.creator.nickname}` : ""}`,
-                  action: () => void loadPlaylist(playlist.id),
-                }))}
-                loadMore={hasMore ? { label: "加载更多歌单", action: () => void search(true) } : undefined}
+            <div className="flex gap-2">
+              <Input
+                placeholder={source === "ncm" ? "搜单曲、歌单、播客" : "搜视频或导入收藏夹"}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && void search()}
+                className="h-10"
               />
-            </TabsContent>
+              <Button onClick={() => void search()} disabled={searching} className="h-10 px-4">
+                {searching ? "搜索中" : "搜索"}
+              </Button>
+            </div>
 
-            <TabsContent value="dj" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
-              <PanelList
-                empty="还没有播客结果。"
-                items={djRadios.map((radio) => ({
-                  id: radio.id,
-                  icon: "🎙️",
-                  title: radio.name,
-                  meta: `${radio.programCount || "?"} 期${radio.dj ? ` · ${radio.dj.nickname}` : ""}`,
-                  action: () => void loadDjRadio(radio.id),
-                }))}
-                loadMore={hasMore ? { label: "加载更多播客", action: () => void search(true) } : undefined}
-              />
-            </TabsContent>
+            {source === "bilibili" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-3">
+                <div className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "B 站未登录"}</div>
+                <div className="flex gap-2">
+                  {biliLoggedIn ? (
+                    <Button variant="outline" size="sm" onClick={onBiliLogout}>退出</Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
+                      <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
 
-            <TabsContent value="fav" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
-              {biliLoggedIn ? (
-                favLoading ? (
-                  <EmptyState text="收藏夹加载中..." />
-                ) : favFolders.length > 0 ? (
-                  <PanelList
-                    empty="没有读取到收藏夹。"
-                    items={favFolders.map((folder) => ({
-                      id: folder.id,
-                      icon: favLoadingId === folder.id ? "⏳" : "📁",
-                      title: folder.title,
-                      meta: `${folder.mediaCount} 个视频`,
-                      action: () => void loadFavFolder(folder.id),
-                    }))}
-                  />
+          <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-5">
+            <Tabs value={tab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col gap-4">
+              <TabsList className={`grid w-full ${source === "ncm" ? "grid-cols-3" : "grid-cols-2"}`}>
+                {source === "ncm" ? (
+                  <>
+                    <TabsTrigger value="song">单曲</TabsTrigger>
+                    <TabsTrigger value="playlist">歌单</TabsTrigger>
+                    <TabsTrigger value="dj">播客</TabsTrigger>
+                  </>
+                ) : (
+                  <>
+                    <TabsTrigger value="video">视频</TabsTrigger>
+                    <TabsTrigger value="fav">收藏夹</TabsTrigger>
+                  </>
+                )}
+              </TabsList>
+
+              <TabsContent value="song" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
+                <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} />
+              </TabsContent>
+
+              <TabsContent value="video" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
+                <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} favHasMore={favHasMore && !!favMediaId} onLoadMoreFav={() => favMediaId && void loadFavFolder(favMediaId, true)} />
+              </TabsContent>
+
+              <TabsContent value="playlist" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
+                <PanelList
+                  empty="还没有歌单结果。"
+                  items={playlists.map((playlist) => ({
+                    id: playlist.id,
+                    icon: "🎵",
+                    title: playlist.name,
+                    meta: `${playlist.trackCount || "?"} 首${playlist.creator ? ` · ${playlist.creator.nickname}` : ""}`,
+                    action: () => void loadPlaylist(playlist.id),
+                  }))}
+                  loadMore={hasMore ? { label: "加载更多歌单", action: () => void search(true) } : undefined}
+                />
+              </TabsContent>
+
+              <TabsContent value="dj" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
+                <PanelList
+                  empty="还没有播客结果。"
+                  items={djRadios.map((radio) => ({
+                    id: radio.id,
+                    icon: "🎙️",
+                    title: radio.name,
+                    meta: `${radio.programCount || "?"} 期${radio.dj ? ` · ${radio.dj.nickname}` : ""}`,
+                    action: () => void loadDjRadio(radio.id),
+                  }))}
+                  loadMore={hasMore ? { label: "加载更多播客", action: () => void search(true) } : undefined}
+                />
+              </TabsContent>
+
+              <TabsContent value="fav" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=active]:flex">
+                {biliLoggedIn ? (
+                  favLoading ? (
+                    <EmptyState text="收藏夹加载中..." />
+                  ) : favFolders.length > 0 ? (
+                    <PanelList
+                      empty="没有读取到收藏夹。"
+                      items={favFolders.map((folder) => ({
+                        id: folder.id,
+                        icon: favLoadingId === folder.id ? "⏳" : "📁",
+                        title: folder.title,
+                        meta: `${folder.mediaCount} 个视频`,
+                        action: () => void loadFavFolder(folder.id),
+                      }))}
+                    />
+                  ) : (
+                    <div className="flex min-h-0 flex-1 flex-col justify-center rounded-2xl border border-border/60 bg-muted/20 px-4 py-8 text-center">
+                      <p className="text-sm font-medium">没有读取到收藏夹</p>
+                      <Button variant="outline" size="sm" className="mx-auto mt-4" onClick={() => void fetchFavorites()}>重新加载</Button>
+                    </div>
+                  )
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col justify-center rounded-2xl border border-border/60 bg-muted/20 px-4 py-8 text-center">
-                    <p className="text-sm font-medium">没有读取到收藏夹</p>
-                    <Button variant="outline" size="sm" className="mx-auto mt-4" onClick={() => void fetchFavorites()}>重新加载</Button>
+                    <p className="text-sm font-medium">登录后才能读取收藏夹</p>
+                    <div className="mt-4 flex justify-center gap-2">
+                      <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
+                      <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
+                    </div>
                   </div>
-                )
-              ) : (
-                <div className="flex min-h-0 flex-1 flex-col justify-center rounded-2xl border border-border/60 bg-muted/20 px-4 py-8 text-center">
-                  <p className="text-sm font-medium">登录后才能读取收藏夹</p>
-                  <div className="mt-4 flex justify-center gap-2">
-                    <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
-                    <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-      </section>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
+      ) : null}
 
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
-        <div className="space-y-4 border-b border-border/60 px-4 py-4 sm:px-5">
+      <section className={`flex h-full min-w-0 flex-col overflow-hidden bg-background ${searchOpen ? "w-1/2" : "w-full"}`}>
+        <div className="space-y-3 border-b border-border/60 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-semibold">我的歌单</h3>
             <div className="flex flex-wrap items-center gap-2">
@@ -381,6 +387,9 @@ export function RightPanels({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={onToggleSearch}>
+              {searchOpen ? "收起找歌" : "添加歌曲"}
+            </Button>
             <Button variant="outline" size="sm" onClick={onRandomize} disabled={mySongs.length === 0}>随机顺序</Button>
             <Button variant="ghost" size="sm" onClick={onClear} disabled={mySongs.length === 0}>清空歌单</Button>
           </div>
@@ -388,9 +397,9 @@ export function RightPanels({
         </div>
 
         <div className="min-h-0 flex-1 px-4 py-4 sm:px-5">
-          <div className="h-full min-h-0 space-y-2 overflow-y-auto pr-1">
+          <div className="h-full min-h-0 space-y-1.5 overflow-y-auto pr-1.5">
             {mySongs.length === 0 ? (
-              <EmptyState text="先在上面搜歌，这里才会有内容。" />
+              <EmptyState text={searchOpen ? "在左侧搜歌后加入歌单。" : "点击「添加歌曲」搜索后加入。"} />
             ) : (
               mySongs.map((item, index) => {
                 const song = parseSong(item.songData);
@@ -415,25 +424,25 @@ export function RightPanels({
                       updated.splice(index, 0, moved);
                       onReorder(updated.map((entry, sortOrder) => ({ id: entry.id, sortOrder })));
                     }}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${isCurrent ? "border-primary/40 bg-primary/5" : "border-border/60 bg-background"}`}
+                    className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition ${isCurrent ? "border-primary/40 bg-primary/5" : "border-border/60 bg-background"}`}
                   >
-                    <div className="w-6 text-center text-xs text-muted-foreground">{index + 1}</div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+                    <div className="w-5 shrink-0 text-center text-[11px] text-muted-foreground tabular-nums">{index + 1}</div>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                       {song?.picUrl ? (
                         <img src={proxyImage(song.picUrl)} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-xs">{song?.source === "bilibili" ? "📺" : "🎵"}</span>
+                        <span className="text-[10px]">{song?.source === "bilibili" ? "📺" : "🎵"}</span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className={`truncate text-sm font-medium ${isCurrent ? "text-primary" : "text-foreground"}`}>{song?.name || "无效歌曲"}</div>
-                      <div className="truncate text-xs text-muted-foreground">{song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists || "未知作者"}</div>
+                      <div className={`truncate text-[13px] font-medium leading-tight ${isCurrent ? "text-primary" : "text-foreground"}`}>{song?.name || "无效歌曲"}</div>
+                      <div className="truncate text-[11px] leading-tight text-muted-foreground">{song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists || "未知作者"}</div>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
+                    <div className="text-right text-[11px] text-muted-foreground">
                       <div className="font-mono tabular-nums">{song ? fmt(song.duration) : "--:--"}</div>
-                      {isCurrent ? <div className="text-primary">正在播放</div> : null}
+                      {isCurrent ? <div className="text-primary">播放中</div> : null}
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => onDelete(item.id)} aria-label="删除歌曲">✕</Button>
+                    <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => onDelete(item.id)} aria-label="删除歌曲">✕</Button>
                   </div>
                 );
               })
@@ -470,7 +479,7 @@ function ResultSection({
         </Button>
       ) : null}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
         {songs.length === 0 ? (
           <EmptyState text="还没有结果。" />
         ) : (
@@ -514,7 +523,7 @@ function PanelList({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
         {items.length === 0 ? (
           <EmptyState text={empty} />
         ) : (

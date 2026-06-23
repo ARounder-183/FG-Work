@@ -132,3 +132,23 @@
 }
 
 /* Theme toggle circular reveal — driven by injected <style> in navbar.tsx */
+
+@keyframes fg-music-aurora {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(-3%, 2%, 0) scale(1.08); }
+  66%      { transform: translate3d(2%, -3%, 0) scale(0.96); }
+}
+
+@keyframes fg-music-aurora-alt {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(4%, -2%, 0) scale(0.94); }
+}
+
+.fg-music-aurora-1 {
+  animation: fg-music-aurora 18s ease-in-out infinite;
+  will-change: transform;
+}
+.fg-music-aurora-2 {
+  animation: fg-music-aurora-alt 22s ease-in-out infinite;
+  will-change: transform;
+}

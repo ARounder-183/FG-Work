@@ -29,7 +29,7 @@ export default function RootLayout({
             <MusicProvider>
             <StudyProvider>
               <Navbar />
-              <main className="flex-1 overflow-y-auto">{children}</main>
+              <main className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">{children}</main>
               <Toaster richColors />
             </StudyProvider>
             </MusicProvider>
