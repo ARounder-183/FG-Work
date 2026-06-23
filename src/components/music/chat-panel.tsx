@@ -165,14 +165,14 @@ export function ChatPanel() {
   };
 
   return (
-    <div className="grid h-[26rem] grid-rows-[auto_1fr_auto]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+    <div className="grid h-[32rem] grid-rows-[auto_1fr_auto] bg-transparent">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Badge variant="outline">{messages.length} 条消息</Badge>
             <Badge variant="secondary">TTS 开启</Badge>
           </div>
-          <p className="text-xs text-muted-foreground">消息会在你停留在页面时继续刷新，并按顺序播报新内容。</p>
+          <p className="text-xs text-muted-foreground">你停留在页面时，消息会持续刷新并顺序播报。</p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <span>播报音量</span>
@@ -192,9 +192,9 @@ export function ChatPanel() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="space-y-3 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
         {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-[20px] border border-dashed border-border text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center rounded-[22px] border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
             还没有聊天记录，发一句开场白吧。
           </div>
         ) : (
@@ -204,31 +204,31 @@ export function ChatPanel() {
 
             return (
               <div key={message.id} className={`flex gap-3 ${mine ? "justify-end" : "justify-start"}`}>
-                {!mine && (
+                {!mine ? (
                   <Avatar className="mt-1 h-9 w-9 shrink-0 border border-border/60">
                     <AvatarImage src={message.user.avatar || ""} />
                     <AvatarFallback>{message.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
-                )}
+                ) : null}
 
-                <div className={`max-w-[85%] space-y-1 ${mine ? "items-end" : "items-start"}`}>
-                  {showMeta && (
+                <div className={`max-w-[86%] space-y-1 ${mine ? "items-end" : "items-start"}`}>
+                  {showMeta ? (
                     <div className={`flex items-center gap-2 text-xs text-muted-foreground ${mine ? "justify-end" : "justify-start"}`}>
                       <span>{message.user.username}</span>
                       <span>{formatTime(message.createdAt)}</span>
                     </div>
-                  )}
-                  <div className={`rounded-[20px] px-4 py-3 text-sm leading-6 shadow-sm ${mine ? "bg-primary text-primary-foreground" : "border border-border/60 bg-background"}`}>
+                  ) : null}
+                  <div className={`rounded-[20px] px-4 py-3 text-sm leading-6 shadow-sm ${mine ? "bg-foreground text-background" : "border border-border/60 bg-background"}`}>
                     {message.content}
                   </div>
                 </div>
 
-                {mine && (
+                {mine ? (
                   <Avatar className="mt-1 h-9 w-9 shrink-0 border border-border/60">
                     <AvatarImage src={message.user.avatar || ""} />
                     <AvatarFallback>{message.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
-                )}
+                ) : null}
               </div>
             );
           })
@@ -236,14 +236,14 @@ export function ChatPanel() {
       </div>
 
       {user ? (
-        <div className="border-t border-border/60 px-4 py-3">
+        <div className="border-t border-border/60 px-4 py-3 sm:px-5">
           <div className="flex gap-2">
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && void handleSend()}
               placeholder="说点什么，让房间活起来"
-              className="h-11 bg-background"
+              className="h-11 border-0 bg-muted/35"
             />
             <Button className="h-11 px-4" onClick={() => void handleSend()} disabled={sending || !input.trim()}>
               {sending ? "发送中" : "发送"}
@@ -251,7 +251,7 @@ export function ChatPanel() {
           </div>
         </div>
       ) : (
-        <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground">
+        <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground sm:px-5">
           登录后才能在音乐室里聊天。
         </div>
       )}
