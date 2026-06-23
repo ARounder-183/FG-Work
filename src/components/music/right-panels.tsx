@@ -4,7 +4,9 @@ import { apiUrl, proxyImage } from "@/lib/url";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 interface Song {
@@ -18,21 +20,52 @@ interface Song {
   bvid?: string;
   cid?: number;
 }
-interface MySong { id: string; songData: string; sortOrder: number; }
-interface PlaylistResult { id: number; name: string; coverImgUrl?: string; trackCount?: number; creator?: { nickname: string }; }
-interface DjRadio { id: number; name: string; coverUrl?: string; programCount?: number; dj?: { nickname: string }; }
 
-function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
+interface MySong {
+  id: string;
+  songData: string;
+  sortOrder: number;
+}
+
+interface PlaylistResult {
+  id: number;
+  name: string;
+  coverImgUrl?: string;
+  trackCount?: number;
+  creator?: { nickname: string };
+}
+
+interface DjRadio {
+  id: number;
+  name: string;
+  coverUrl?: string;
+  programCount?: number;
+  dj?: { nickname: string };
+}
+
+function fmt(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remain = Math.floor(seconds % 60);
+  return `${minutes}:${String(remain).padStart(2, "0")}`;
+}
+
+function parseSong(raw: string): Song | null {
+  try {
+    return JSON.parse(raw) as Song;
+  } catch {
+    return null;
+  }
+}
 
 interface Props {
   mySongs: MySong[];
   currentSong: Song | null;
-  onReorder: (s: {id:string;sortOrder:number}[]) => void;
+  onReorder: (songs: Array<{ id: string; sortOrder: number }>) => void;
   onClear: () => void;
   onRandomize: () => void;
   onDelete: (id: string) => void;
-  onAddSong: (s:Song) => void;
-  onAddSongs: (s:Song[]) => void;
+  onAddSong: (song: Song) => void;
+  onAddSongs: (songs: Song[]) => void;
   biliLoggedIn?: boolean;
   biliUname?: string;
   onBiliLogin?: () => void;
@@ -40,9 +73,21 @@ interface Props {
   onBiliLogout?: () => void;
 }
 
-export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandomize, onDelete, onAddSong, onAddSongs, biliLoggedIn, biliUname, onBiliLogin, onPhoneLogin, onBiliLogout }: Props) {
-  const [searchOpen, setSearchOpen] = useState(true);
-  const [myOpen, setMyOpen] = useState(true);
+export function RightPanels({
+  mySongs,
+  currentSong,
+  onReorder,
+  onClear,
+  onRandomize,
+  onDelete,
+  onAddSong,
+  onAddSongs,
+  biliLoggedIn,
+  biliUname,
+  onBiliLogin,
+  onPhoneLogin,
+  onBiliLogout,
+}: Props) {
   const [source, setSource] = useState<"ncm" | "bilibili">("ncm");
   const [tab, setTab] = useState("song");
   const [query, setQuery] = useState("");
@@ -52,8 +97,6 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
   const [searching, setSearching] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
-
-  // Bilibili favorites
   const [favFolders, setFavFolders] = useState<Array<{ id: number; fid: number; title: string; mediaCount: number }>>([]);
   const [favLoading, setFavLoading] = useState(false);
   const [favLoadingId, setFavLoadingId] = useState<number | null>(null);
@@ -63,66 +106,66 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
 
   const search = async (append = false) => {
     if (!query.trim()) return;
+
     setSearching(true);
-    const type = tab;
     const offset = append ? nextOffset : 0;
-    const r = await fetch(apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${type}&source=${source}&offset=${offset}`));
-    const d = await r.json();
+    const response = await fetch(
+      apiUrl(`/api/music/search?q=${encodeURIComponent(query.trim())}&type=${tab}&source=${source}&offset=${offset}`),
+    );
+    const data = await response.json();
 
     const resultKey = tab === "song" || tab === "video" ? "songs" : tab === "dj" ? "djRadios" : "playlists";
     const current = tab === "song" || tab === "video" ? songs : tab === "dj" ? djRadios : playlists;
     const setFn = tab === "song" || tab === "video" ? setSongs : tab === "dj" ? setDjRadios : setPlaylists;
 
-    setFn(append ? [...current, ...(d[resultKey] || [])] : (d[resultKey] || []));
-    // Clear other tab results
-    if (tab === "song" || tab === "video") { setPlaylists([]); setDjRadios([]); }
-    else if (tab === "dj") { setSongs([]); setPlaylists([]); }
-    else { setSongs([]); setDjRadios([]); }
-    setHasMore(d.hasMore || false);
-    setNextOffset(d.nextOffset || 0);
+    setFn(append ? [...current, ...(data[resultKey] || [])] : (data[resultKey] || []));
+    if (tab === "song" || tab === "video") {
+      setPlaylists([]);
+      setDjRadios([]);
+    } else if (tab === "dj") {
+      setSongs([]);
+      setPlaylists([]);
+    } else {
+      setSongs([]);
+      setDjRadios([]);
+    }
+
+    setHasMore(data.hasMore || false);
+    setNextOffset(data.nextOffset || 0);
     setSearching(false);
   };
 
-  // Reset pagination when switching tabs
-  const handleTabChange = (val: string) => {
-    setTab(val);
-    setHasMore(false);
-    setNextOffset(0);
-    // Auto-load favorites when switching to fav tab
-    if (val === "fav" && biliLoggedIn) fetchFavorites();
-  };
-
-  // Fetch Bilibili favorites list
   const fetchFavorites = async () => {
     setFavLoading(true);
     try {
-      const r = await fetch(apiUrl("/api/bilibili/fav/list"));
-      const d = await r.json();
-      if (d.folders) setFavFolders(d.folders);
-    } catch { /* silent */ }
+      const response = await fetch(apiUrl("/api/bilibili/fav/list"));
+      const data = await response.json();
+      if (data.folders) setFavFolders(data.folders);
+    } catch {}
     setFavLoading(false);
   };
 
-  // Load favorites folder contents as songs
   const loadFavFolder = async (mediaId: number, append = false) => {
     setFavLoadingId(mediaId);
     try {
       const nextPage = append ? favPage + 1 : 1;
-      const r = await fetch(apiUrl(`/api/bilibili/fav/detail?media_id=${mediaId}&page=${nextPage}`));
-      const d = await r.json();
-      if (d.songs?.length) {
+      const response = await fetch(apiUrl(`/api/bilibili/fav/detail?media_id=${mediaId}&page=${nextPage}`));
+      const data = await response.json();
+
+      if (data.songs?.length) {
         if (append) {
-          setSongs((prev) => [...prev, ...d.songs]);
+          setSongs((prev) => [...prev, ...data.songs]);
           setFavPage(nextPage);
         } else {
-          setSongs(d.songs);
+          setSongs(data.songs);
           setFavPage(1);
           setFavMediaId(mediaId);
           setTab("video");
-          setFavFolders([]); // Clear favorites display after load
+          setFavFolders([]);
         }
-        setFavHasMore(d.hasMore || false);
-        toast.success(append ? `已加载更多 (${d.songs.length} 首)` : `已加载收藏夹 (${d.songs.length} 首)`);
+
+        setFavHasMore(data.hasMore || false);
+        toast.success(append ? `已加载更多 ${data.songs.length} 首` : `已导入收藏夹 ${data.songs.length} 首`);
       } else {
         toast.error("加载失败");
       }
@@ -132,9 +175,17 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     setFavLoadingId(null);
   };
 
-  // Switch source — reset everything
-  const handleSourceChange = (s: "ncm" | "bilibili") => {
-    setSource(s);
+  const handleTabChange = (value: string) => {
+    setTab(value);
+    setHasMore(false);
+    setNextOffset(0);
+    if (value === "fav" && biliLoggedIn) {
+      void fetchFavorites();
+    }
+  };
+
+  const handleSourceChange = (nextSource: "ncm" | "bilibili") => {
+    setSource(nextSource);
     setSongs([]);
     setPlaylists([]);
     setDjRadios([]);
@@ -144,292 +195,323 @@ export function RightPanels({ mySongs, currentSong, onReorder, onClear, onRandom
     setFavHasMore(false);
     setHasMore(false);
     setNextOffset(0);
-    setTab(s === "bilibili" ? "video" : "song");
-    if (s === "bilibili" && biliLoggedIn) fetchFavorites();
+    setTab(nextSource === "bilibili" ? "video" : "song");
+    if (nextSource === "bilibili" && biliLoggedIn) {
+      void fetchFavorites();
+    }
   };
 
   const loadPlaylist = async (id: number) => {
-    const r = await fetch(apiUrl(`/api/music/playlist?id=${id}`));
-    const d = await r.json();
-    if (d.playlist?.tracks) { setSongs(d.playlist.tracks); setTab("song"); toast.success(`已加载：${d.playlist.name}`); }
-    else toast.error("加载失败");
+    const response = await fetch(apiUrl(`/api/music/playlist?id=${id}`));
+    const data = await response.json();
+    if (data.playlist?.tracks) {
+      setSongs(data.playlist.tracks);
+      setTab("song");
+      toast.success(`已加载 ${data.playlist.name}`);
+      return;
+    }
+    toast.error("加载失败");
   };
 
   const loadDjRadio = async (id: number) => {
-    const r = await fetch(apiUrl(`/api/music/dj?id=${id}`));
-    const d = await r.json();
-    if (d.songs?.length) { setSongs(d.songs); setTab("song"); toast.success(`已加载电台节目`); }
-    else toast.error("加载失败");
+    const response = await fetch(apiUrl(`/api/music/dj?id=${id}`));
+    const data = await response.json();
+    if (data.songs?.length) {
+      setSongs(data.songs);
+      setTab("song");
+      toast.success("已加载电台节目");
+      return;
+    }
+    toast.error("加载失败");
   };
 
-  return (
-    <>
-      {/* Search panel (left of the two) */}
-      {searchOpen && (
-        <div className="flex w-60 shrink-0 flex-col border-l bg-background max-h-[calc(100vh-3.5rem)] overflow-hidden">
-          <div className="flex items-center justify-between border-b px-2.5 py-2">
-            <span className="text-xs font-semibold">添加歌曲</span>
-            <button onClick={() => setSearchOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
-          </div>
+  const totalDuration = mySongs.reduce((sum, item) => {
+    const song = parseSong(item.songData);
+    return sum + (song?.duration || 0);
+  }, 0);
 
-          {/* Source toggle */}
-          <div className="flex border-b">
+  return (
+    <div className="grid gap-5 p-5 sm:p-6">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Search Source</p>
+            <h3 className="mt-1 text-lg font-semibold">找歌与导入</h3>
+          </div>
+          <div className="inline-flex rounded-full border border-border bg-muted/40 p-1">
             <button
               onClick={() => handleSourceChange("ncm")}
-              className={`flex-1 py-1.5 text-[10px] font-medium transition-colors ${
-                source === "ncm"
-                  ? "border-b-2 border-primary text-primary bg-primary/5"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >🎵 网易云</button>
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${source === "ncm" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+            >
+              网易云
+            </button>
             <button
               onClick={() => handleSourceChange("bilibili")}
-              className={`flex-1 py-1.5 text-[10px] font-medium transition-colors ${
-                source === "bilibili"
-                  ? "border-b-2 border-primary text-primary bg-primary/5"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >📺 Bilibili</button>
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${source === "bilibili" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+            >
+              Bilibili
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-border/60 bg-muted/30 p-3">
+          <div className="flex gap-2">
+            <Input
+              placeholder={source === "ncm" ? "搜单曲、歌单、播客" : "搜视频或导入收藏夹"}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && void search()}
+              className="h-10 bg-background"
+            />
+            <Button onClick={() => void search()} disabled={searching} className="h-10 px-4">
+              {searching ? "搜索中" : "搜索"}
+            </Button>
           </div>
 
-          <div className="flex gap-1 border-b px-1.5 py-1">
-            <Input placeholder="搜索" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} className="h-6 text-[10px]" />
-              <Button size="sm" className="h-6 text-[10px]" onClick={() => search()} disabled={searching}>{searching?"..":"搜索"}</Button>
-          </div>
-
-          {source === "ncm" ? (
-            <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
-              <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-3">
-                <TabsTrigger value="song" className="text-[10px] h-6">单曲</TabsTrigger>
-                <TabsTrigger value="playlist" className="text-[10px] h-6">歌单</TabsTrigger>
-                <TabsTrigger value="dj" className="text-[10px] h-6">播客</TabsTrigger>
-              </TabsList>
-              <TabsContent value="song" className="flex-1 overflow-y-auto">
-                {songs.length>0 && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="outline" size="sm" className="w-full text-[10px]" onClick={()=>{onAddSongs(songs);toast.success(`已添加 ${songs.length} 首`)}}>全部添加 ({songs.length})</Button>
-                  </div>
-                )}
-                <div className="divide-y">
-                  {songs.map((s,i)=>(
-                    <div key={String(s.id)||i} className="flex items-center gap-1 px-1.5 py-1 text-[11px] hover:bg-accent">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate">{s.name}</div>
-                        <div className="truncate text-muted-foreground/70">{s.artists}</div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="h-4 w-4 p-0 text-[10px]" onClick={()=>onAddSong(s)}>+</Button>
-                    </div>
-                  ))}
-                </div>
-                {hasMore && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="playlist" className="flex-1 overflow-y-auto divide-y">
-                {playlists.map(p=>(
-                  <div key={p.id} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1.5 hover:bg-accent" onClick={()=>loadPlaylist(p.id)}>
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">🎵</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[11px] font-medium">{p.name}</div>
-                      <div className="text-[10px] text-muted-foreground">{p.trackCount||"?"} 首{p.creator ? ` · ${p.creator.nickname}` : ""}</div>
-                    </div>
-                  </div>
-                ))}
-                {hasMore && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="dj" className="flex-1 overflow-y-auto divide-y">
-                {djRadios.map(r=>(
-                  <div key={r.id} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1.5 hover:bg-accent" onClick={()=>loadDjRadio(r.id)}>
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">🎙️</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[11px] font-medium">{r.name}</div>
-                      <div className="text-[10px] text-muted-foreground">{r.programCount||"?"} 期{r.dj ? ` · ${r.dj.nickname}` : ""}</div>
-                    </div>
-                  </div>
-                ))}
-                {hasMore && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <>
-              {/* Bilibili login bar */}
-              <div className="flex items-center justify-between border-b px-2.5 py-1">
+          {source === "bilibili" && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-border/60 bg-background px-3 py-2.5">
+              <div>
+                <div className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "B 站尚未登录"}</div>
+                <div className="text-xs text-muted-foreground">登录后可直接导入收藏夹里的音频视频</div>
+              </div>
+              <div className="flex gap-2">
                 {biliLoggedIn ? (
-                  <>
-                    <span className="text-[10px] text-muted-foreground">👤 {biliUname || "已登录B站"}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 text-[9px] text-destructive hover:text-destructive"
-                      onClick={onBiliLogout}
-                    >
-                      退出
-                    </Button>
-                  </>
+                  <Button variant="outline" size="sm" onClick={onBiliLogout}>退出</Button>
                 ) : (
                   <>
-                    <span className="text-[10px] text-muted-foreground">🔐 B站未登录</span>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-5 text-[9px]"
-                        onClick={onBiliLogin}
-                      >
-                        扫码
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-5 text-[9px]"
-                        onClick={onPhoneLogin}
-                      >
-                        短信登录
-                      </Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
+                    <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
                   </>
                 )}
               </div>
-            <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
-              <TabsList className="mx-1.5 mt-1 grid w-auto grid-cols-2">
-                <TabsTrigger value="video" className="text-[10px] h-6">视频</TabsTrigger>
-                <TabsTrigger value="fav" className="text-[10px] h-6">收藏夹</TabsTrigger>
-              </TabsList>
-              <TabsContent value="video" className="flex-1 overflow-y-auto">
-                {songs.length>0 && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="outline" size="sm" className="w-full text-[10px]" onClick={()=>{onAddSongs(songs);toast.success(`已添加 ${songs.length} 首`)}}>全部添加 ({songs.length})</Button>
-                  </div>
-                )}
-                <div className="divide-y">
-                  {songs.map((s,i)=>(
-                    <div key={String(s.id)||i} className="flex items-center gap-1 px-1.5 py-1 text-[11px] hover:bg-accent">
-                      <span className="shrink-0 text-[9px]" title="Bilibili">📺</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate">{s.name}</div>
-                        <div className="truncate text-muted-foreground/70">UP: {s.artists}</div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="h-4 w-4 p-0 text-[10px]" onClick={()=>onAddSong(s)}>+</Button>
-                    </div>
-                  ))}
-                </div>
-                {hasMore && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => search(true)}>加载更多</Button>
-                  </div>
-                )}
-                {favHasMore && favMediaId && (
-                  <div className="border-b px-1.5 py-1">
-                    <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => loadFavFolder(favMediaId, true)}>加载更多收藏</Button>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="fav" className="flex-1 overflow-y-auto">
-                {biliLoggedIn ? (
-                  favLoading ? (
-                    <p className="p-4 text-center text-[11px] text-muted-foreground">加载中...</p>
-                  ) : favFolders.length > 0 ? (
-                    <div className="divide-y">
-                      {favFolders.map((f) => (
-                        <div
-                          key={f.id}
-                          className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1.5 hover:bg-accent"
-                          onClick={() => loadFavFolder(f.id)}
-                        >
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-xs">
-                            {favLoadingId === f.id ? "⏳" : "📁"}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-[11px] font-medium">{f.title}</div>
-                            <div className="text-[10px] text-muted-foreground">{f.mediaCount} 个视频</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center">
-                      <p className="text-[11px] text-muted-foreground mb-1">👤 {biliUname || "已登录"}</p>
-                      <p className="text-[10px] text-muted-foreground mb-2">暂无收藏夹或加载失败</p>
-                      <Button size="sm" className="h-6 text-[10px]" onClick={fetchFavorites}>重新加载</Button>
-                    </div>
-                  )
-                ) : (
-                  <div className="p-4 text-center">
-                    <p className="mb-2 text-[11px] text-muted-foreground">🔐 登录B站后可查看收藏夹</p>
-                    <Button size="sm" className="h-6 text-[10px]" onClick={onBiliLogin}>扫码登录</Button>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-            </>
+            </div>
           )}
         </div>
-      )}
 
-      {/* My playlist panel (right of search) */}
-      {myOpen && (
-        <div className="flex w-60 shrink-0 flex-col border-l bg-background max-h-[calc(100vh-3.5rem)] overflow-hidden">
-          <div className="flex items-center justify-between border-b px-2.5 py-2">
-            <span className="text-xs font-semibold">我的歌单 ({mySongs.length})</span>
-            <button onClick={() => setMyOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
-          </div>
-          <div className="flex gap-1 border-b px-1.5 py-1">
-            <Button variant="ghost" size="sm" className="h-6 flex-1 text-[10px]" onClick={onRandomize} disabled={mySongs.length===0}>随机</Button>
-            <Button variant="ghost" size="sm" className="h-6 flex-1 text-[10px] text-destructive" onClick={onClear} disabled={mySongs.length===0}>清空</Button>
-          </div>
-          <div className="flex-1 overflow-y-auto divide-y">
-            {mySongs.length === 0 ? (
-              <p className="p-3 text-center text-[11px] text-muted-foreground">从搜索添加歌曲</p>
-            ) : mySongs.map((item, i) => {
-              const s = JSON.parse(item.songData) as Song;
-              const isCur = currentSong
-                ? s.source === "bilibili"
-                  ? s.bvid === (currentSong as Song).bvid
-                  : s.id === currentSong.id
-                : false;
-              return (
-                <div key={item.id} draggable onDragStart={e=>{e.dataTransfer.setData("idx",String(i))}} onDragOver={e=>e.preventDefault()} onDrop={e=>{
-                  e.preventDefault(); const from=Number(e.dataTransfer.getData("idx")); if(from===i)return;
-                  const u=[...mySongs]; const [m]=u.splice(from,1); u.splice(i,0,m); onReorder(u.map((x,j)=>({id:x.id,sortOrder:j})));
-                }} className={`flex cursor-grab items-center gap-1 px-2 py-1 text-[11px] active:cursor-grabbing ${isCur?"bg-primary/10":"hover:bg-accent"}`}>
-                  <span className="w-4 text-center tabular-nums text-muted-foreground">{String(i+1).padStart(2,"0")}</span>
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                    {s.picUrl ? <img src={proxyImage(s.picUrl)} alt="" className="h-full w-full object-cover"/> : <span className="text-[7px]">{s.source === "bilibili" ? "📺" : "🎵"}</span>}
-                  </div>
+        <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
+          <TabsList className={`grid w-full ${source === "ncm" ? "grid-cols-3" : "grid-cols-2"}`}>
+            {source === "ncm" ? (
+              <>
+                <TabsTrigger value="song">单曲</TabsTrigger>
+                <TabsTrigger value="playlist">歌单</TabsTrigger>
+                <TabsTrigger value="dj">播客</TabsTrigger>
+              </>
+            ) : (
+              <>
+                <TabsTrigger value="video">视频</TabsTrigger>
+                <TabsTrigger value="fav">收藏夹</TabsTrigger>
+              </>
+            )}
+          </TabsList>
+
+          <TabsContent value="song" className="space-y-3">
+            <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} />
+          </TabsContent>
+
+          <TabsContent value="video" className="space-y-3">
+            <ResultSection songs={songs} onAddSong={onAddSong} onAddSongs={onAddSongs} hasMore={hasMore} onLoadMore={() => void search(true)} favHasMore={favHasMore && !!favMediaId} onLoadMoreFav={() => favMediaId && void loadFavFolder(favMediaId, true)} />
+          </TabsContent>
+
+          <TabsContent value="playlist" className="space-y-3">
+            <div className="space-y-2">
+              {playlists.map((playlist) => (
+                <button key={playlist.id} onClick={() => void loadPlaylist(playlist.id)} className="flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-background px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-sm">🎵</div>
                   <div className="min-w-0 flex-1">
-                    <div className={`truncate text-[10px] ${isCur?"font-medium text-primary":""}`}>{s.name}</div>
-                    <div className="truncate text-[9px] text-muted-foreground/70">
-                      {s.source === "bilibili" ? `UP: ${s.artists}` : s.artists}
-                    </div>
+                    <div className="truncate text-sm font-medium">{playlist.name}</div>
+                    <div className="text-xs text-muted-foreground">{playlist.trackCount || "?"} 首 {playlist.creator ? `· ${playlist.creator.nickname}` : ""}</div>
                   </div>
-                  <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">{fmt(s.duration)}</span>
-                  <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="ml-0.5 text-muted-foreground hover:text-destructive text-[10px]">✕</button>
+                </button>
+              ))}
+            </div>
+            {hasMore && <Button variant="outline" className="w-full" onClick={() => void search(true)}>加载更多歌单</Button>}
+          </TabsContent>
+
+          <TabsContent value="dj" className="space-y-3">
+            <div className="space-y-2">
+              {djRadios.map((radio) => (
+                <button key={radio.id} onClick={() => void loadDjRadio(radio.id)} className="flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-background px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-sm">🎙️</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{radio.name}</div>
+                    <div className="text-xs text-muted-foreground">{radio.programCount || "?"} 期 {radio.dj ? `· ${radio.dj.nickname}` : ""}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {hasMore && <Button variant="outline" className="w-full" onClick={() => void search(true)}>加载更多播客</Button>}
+          </TabsContent>
+
+          <TabsContent value="fav" className="space-y-3">
+            {biliLoggedIn ? (
+              favLoading ? (
+                <div className="rounded-[20px] border border-border/60 bg-background px-4 py-10 text-center text-sm text-muted-foreground">收藏夹加载中...</div>
+              ) : favFolders.length > 0 ? (
+                <div className="space-y-2">
+                  {favFolders.map((folder) => (
+                    <button key={folder.id} onClick={() => void loadFavFolder(folder.id)} className="flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-background px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-sm">{favLoadingId === folder.id ? "⏳" : "📁"}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{folder.title}</div>
+                        <div className="text-xs text-muted-foreground">{folder.mediaCount} 个视频</div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
+              ) : (
+                <div className="rounded-[20px] border border-border/60 bg-background px-4 py-8 text-center">
+                  <p className="text-sm font-medium">没有读取到收藏夹</p>
+                  <p className="mt-1 text-xs text-muted-foreground">可能是收藏夹为空，也可能是 B 站接口这次没返回。</p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={() => void fetchFavorites()}>重新加载</Button>
+                </div>
+              )
+            ) : (
+              <div className="rounded-[20px] border border-border/60 bg-background px-4 py-8 text-center">
+                <p className="text-sm font-medium">登录 B 站后才能读收藏夹</p>
+                <p className="mt-1 text-xs text-muted-foreground">扫码登录最稳，短信登录适合临时补充。</p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={onBiliLogin}>扫码登录</Button>
+                  <Button variant="ghost" size="sm" onClick={onPhoneLogin}>短信登录</Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">My Queue</p>
+            <h3 className="mt-1 text-lg font-semibold">我的轮播队列</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{mySongs.length} 首</Badge>
+            <Badge variant="secondary">总时长 {fmt(totalDuration)}</Badge>
           </div>
         </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onRandomize} disabled={mySongs.length === 0}>随机顺序</Button>
+          <Button variant="ghost" size="sm" onClick={onClear} disabled={mySongs.length === 0}>清空歌单</Button>
+        </div>
+
+        <div className="space-y-2">
+          {mySongs.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              右上先找歌，左下才会形成你的个人轮播。
+            </div>
+          ) : (
+            mySongs.map((item, index) => {
+              const song = parseSong(item.songData);
+              const isCurrent = currentSong && song
+                ? song.source === "bilibili"
+                  ? song.bvid === currentSong.bvid
+                  : song.id === currentSong.id
+                : false;
+
+              return (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={(event) => event.dataTransfer.setData("idx", String(index))}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const from = Number(event.dataTransfer.getData("idx"));
+                    if (from === index) return;
+                    const updated = [...mySongs];
+                    const [moved] = updated.splice(from, 1);
+                    updated.splice(index, 0, moved);
+                    onReorder(updated.map((entry, sortOrder) => ({ id: entry.id, sortOrder })));
+                  }}
+                  className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 transition ${isCurrent ? "border-primary/40 bg-primary/7" : "border-border/60 bg-background hover:border-primary/30 hover:bg-primary/5"}`}
+                >
+                  <div className="w-7 text-center font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted">
+                    {song?.picUrl ? (
+                      <img src={proxyImage(song.picUrl)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs">{song?.source === "bilibili" ? "📺" : "🎵"}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-sm font-medium ${isCurrent ? "text-primary" : "text-foreground"}`}>{song?.name || "无效歌曲"}</div>
+                    <div className="truncate text-xs text-muted-foreground">{song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists || "未知作者"}</div>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    <div className="font-mono tabular-nums">{song ? fmt(song.duration) : "--:--"}</div>
+                    {isCurrent && <div className="text-primary">正在播放</div>}
+                  </div>
+                  <Button variant="ghost" size="icon-sm" onClick={() => onDelete(item.id)} aria-label="删除歌曲">✕</Button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ResultSection({
+  songs,
+  onAddSong,
+  onAddSongs,
+  hasMore,
+  onLoadMore,
+  favHasMore,
+  onLoadMoreFav,
+}: {
+  songs: Song[];
+  onAddSong: (song: Song) => void;
+  onAddSongs: (songs: Song[]) => void;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  favHasMore?: boolean;
+  onLoadMoreFav?: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {songs.length > 0 && (
+        <Button variant="outline" className="w-full" onClick={() => onAddSongs(songs)}>
+          全部加入队列 ({songs.length})
+        </Button>
       )}
 
-      {/* Toggle icon bar - always visible at rightmost edge */}
-      <div className="flex w-8 shrink-0 flex-col gap-1 border-l bg-background/50 p-1">
-        {!searchOpen && (
-          <button onClick={() => setSearchOpen(true)} className="flex h-8 w-8 items-center justify-center rounded text-xs hover:bg-accent" title="添加歌曲">🔍</button>
-        )}
-        {!myOpen && (
-          <button onClick={() => setMyOpen(true)} className="flex h-8 w-8 items-center justify-center rounded text-xs hover:bg-accent" title="我的歌单">📋</button>
+      <div className="space-y-2">
+        {songs.length === 0 ? (
+          <div className="rounded-[20px] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+            还没有结果，先搜一轮试试。
+          </div>
+        ) : (
+          songs.map((song, index) => (
+            <div key={String(song.id) || index} className="flex items-center gap-3 rounded-[20px] border border-border/60 bg-background px-4 py-3 transition hover:border-primary/40 hover:bg-primary/5">
+              <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-muted">
+                {song.picUrl ? (
+                  <img src={proxyImage(song.picUrl)} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs">{song.source === "bilibili" ? "📺" : "🎵"}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{song.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{song.source === "bilibili" ? `UP: ${song.artists}` : song.artists}</div>
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <div className="font-mono tabular-nums">{fmt(song.duration)}</div>
+                <div>{song.source === "bilibili" ? "视频" : "音频"}</div>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => onAddSong(song)}>加入</Button>
+            </div>
+          ))
         )}
       </div>
-    </>
+
+      {hasMore && <Button variant="ghost" className="w-full" onClick={onLoadMore}>加载更多结果</Button>}
+      {favHasMore && onLoadMoreFav && <Button variant="ghost" className="w-full" onClick={onLoadMoreFav}>加载更多收藏夹歌曲</Button>}
+    </div>
   );
 }

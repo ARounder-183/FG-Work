@@ -3,319 +3,473 @@
 import { apiUrl, proxyImage } from "@/lib/url";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
-interface Song { id: number | string; name: string; artists: string; album: string; duration: number; picUrl?: string; source?: "ncm" | "bilibili"; bvid?: string; cid?: number; }
-interface ActiveUser { id: string; username: string; avatar: string | null; }
+interface Song {
+  id: number | string;
+  name: string;
+  artists: string;
+  album: string;
+  duration: number;
+  picUrl?: string;
+  source?: "ncm" | "bilibili";
+  bvid?: string;
+  cid?: number;
+}
+
+interface ActiveUser {
+  id: string;
+  username: string;
+  avatar: string | null;
+}
+
 interface Props {
-  currentSong: Song | null; isPlaying: boolean; isCurrentUserSong: boolean; serverPosition: number;
-  onSkipVote: () => void; onForceSkip: () => void; skipVotes: number; skipThreshold: number;
-  activeUsers: ActiveUser[]; currentUserId: string | null;
+  currentSong: Song | null;
+  isPlaying: boolean;
+  isCurrentUserSong: boolean;
+  serverPosition: number;
+  onSkipVote: () => void;
+  onForceSkip: () => void;
+  skipVotes: number;
+  skipThreshold: number;
+  activeUsers: ActiveUser[];
+  currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
 }
 
-function fmt(s: number) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; }
-function fmtTotal(s: number) { if (s<=0) return "--:--"; return fmt(s); }
+function fmt(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remain = Math.floor(seconds % 60);
+  return `${minutes}:${String(remain).padStart(2, "0")}`;
+}
 
-// Module-level singletons — survive component unmount/remount
+function fmtTotal(seconds: number) {
+  if (seconds <= 0) return "--:--";
+  return fmt(seconds);
+}
+
 let singletonAudio: HTMLAudioElement | null = null;
 let singletonLastKey: string | null = null;
+let singletonPlaybackToken = 0;
 
-function getAudio(): HTMLAudioElement {
+function getAudio() {
   if (!singletonAudio) {
     singletonAudio = new Audio();
     singletonAudio.volume = 0.7;
   }
+
   return singletonAudio;
 }
 
-export function MainPlayer({ currentSong, isPlaying, isCurrentUserSong, serverPosition, onSkipVote, onForceSkip, skipVotes, skipThreshold, activeUsers, currentUserId, songSubmittedBy }: Props) {
+export function MainPlayer({
+  currentSong,
+  isPlaying,
+  isCurrentUserSong,
+  serverPosition,
+  onSkipVote,
+  onForceSkip,
+  skipVotes,
+  skipThreshold,
+  activeUsers,
+  currentUserId,
+  songSubmittedBy,
+}: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("music-volume");
       if (saved) return Number(saved);
     }
+
     return 0.7;
   });
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [lyric, setLyric] = useState<string | null>(null);
   const [currentLine, setCurrentLine] = useState("");
   const currentSongRef = useRef(currentSong);
-  currentSongRef.current = currentSong;
   const serverPositionRef = useRef(serverPosition);
-  serverPositionRef.current = serverPosition;
   const endedRetries = useRef(0);
   const errorRetries = useRef(0);
   const seekFailCount = useRef(0);
 
-  // ── Audio event listeners ──────────────────────────────────────────
   useEffect(() => {
-    const a = getAudio();
-    const onTime = () => setPosition(a.currentTime);
+    currentSongRef.current = currentSong;
+  }, [currentSong]);
+
+  useEffect(() => {
+    serverPositionRef.current = serverPosition;
+  }, [serverPosition]);
+
+  useEffect(() => {
+    const audio = getAudio();
+
+    const onTime = () => setPosition(audio.currentTime);
     const onEnd = () => {
       const song = currentSongRef.current;
-      const playedEnough = song && song.duration > 0 && a.currentTime >= song.duration * 0.9;
+      const playedEnough = song && song.duration > 0 && audio.currentTime >= song.duration * 0.9;
       if (!playedEnough && endedRetries.current < 3) {
-        endedRetries.current++;
-        setTimeout(() => a.play().catch(() => {}), 1000);
+        endedRetries.current += 1;
+        window.setTimeout(() => audio.play().catch(() => {}), 1000);
       }
-      // 重试 3 次仍未播完或正常结束 → 等服务端时钟切歌
     };
+
     const onError = () => {
-      // Retry transient errors (up to 3 times on same src)
       if (errorRetries.current < 3) {
-        errorRetries.current++;
-        setTimeout(() => {
-          if (a.src && a.paused) a.play().catch(() => {});
+        errorRetries.current += 1;
+        window.setTimeout(() => {
+          if (audio.src && audio.paused) {
+            audio.play().catch(() => {});
+          }
         }, 2000);
         return;
       }
 
-      // After 3 retries for B站: re-fetch a fresh URL from server (CDN URL may have expired)
       const song = currentSongRef.current;
       if (song?.source === "bilibili") {
         errorRetries.current = 0;
-        refetchBiliUrl(song);
+        void refetchBiliUrl(song, isPlaying, serverPositionRef.current, singletonPlaybackToken);
       }
-      // For NCM: just stop after retries — server timer will advance
     };
-    a.addEventListener("timeupdate", onTime);
-    a.addEventListener("ended", onEnd);
-    a.addEventListener("error", onError);
+
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("ended", onEnd);
+    audio.addEventListener("error", onError);
+
     return () => {
-      a.removeEventListener("timeupdate", onTime);
-      a.removeEventListener("ended", onEnd);
-      a.removeEventListener("error", onError);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("ended", onEnd);
+      audio.removeEventListener("error", onError);
     };
-  }, []);
+  }, [isPlaying]);
 
-  // ── Re-fetch B站 URL from server on error (CDN URL may have expired) ───
-  function refetchBiliUrl(song: Song) {
-    const params = new URLSearchParams();
-    params.set("source", "bilibili");
-    params.set("bvid", song.bvid || "");
-    params.set("cid", String(song.cid ?? ""));
-    fetch(apiUrl(`/api/music/song?${params.toString()}`))
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.url && singletonAudio) {
-          loadBiliAudio(singletonAudio, d.url as string);
-        }
-      })
-      .catch(() => {});
-  }
-
-  // ── Volume ─────────────────────────────────────────────────────────
-  useEffect(() => { getAudio().volume = volume; }, [volume]);
-
-  // ── Load song ──────────────────────────────────────────────────────
   useEffect(() => {
-    const a = getAudio();
-    if (!currentSong) { a.pause(); a.src = ""; singletonLastKey = null; return; }
+    getAudio().volume = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    const audio = getAudio();
+
+    if (!currentSong) {
+      audio.pause();
+      audio.src = "";
+      singletonLastKey = null;
+      setCoverUrl(null);
+      setLyric(null);
+      setCurrentLine("");
+      return;
+    }
+
     const songKey = currentSong.source === "bilibili"
       ? `bili:${currentSong.bvid ?? currentSong.id}`
       : `ncm:${currentSong.id}`;
-    if (songKey == null || singletonLastKey === songKey) return;
-    singletonLastKey = songKey ?? null;
 
-    setCoverUrl(null);
+    if (singletonLastKey === songKey) return;
+
+    singletonPlaybackToken += 1;
+    const playbackToken = singletonPlaybackToken;
+    singletonLastKey = songKey;
     endedRetries.current = 0;
     errorRetries.current = 0;
     seekFailCount.current = 0;
-
-    const isBili = currentSong.source === "bilibili";
-
-    // ── Cover ──────────────────────────────────────────────────────────
-    if (isBili) {
-      if (currentSong.picUrl) setCoverUrl(currentSong.picUrl);
-    } else {
-      const detailParams = new URLSearchParams();
-      detailParams.set("id", String(currentSong.id));
-      fetch(apiUrl(`/api/music/song/detail?${detailParams.toString()}`))
-        .then((r) => r.json())
-        .then((d) => { if (d.picUrl) setCoverUrl(d.picUrl); })
-        .catch(() => {});
-    }
-
-    // ── Audio URL ──────────────────────────────────────────────────────
-    if (isBili) {
-      // Each client calls B站 API independently — B站 CDN URLs are per-session
-      const params = new URLSearchParams();
-      params.set("source", "bilibili");
-      params.set("bvid", currentSong.bvid || "");
-      params.set("cid", String(currentSong.cid ?? ""));
-      fetch(apiUrl(`/api/music/song?${params.toString()}`))
-        .then((r) => r.json())
-        .then((d) => { if (d.url && singletonAudio) loadBiliAudio(singletonAudio, d.url as string); })
-        .catch(() => {});
-    } else {
-      // NCM: direct URL — no proxy needed
-      const params = new URLSearchParams();
-      params.set("id", String(currentSong.id));
-      fetch(apiUrl(`/api/music/song?${params.toString()}`))
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.url && singletonAudio) {
-            singletonAudio.src = (d.url as string).replace(/^http:/, "https:");
-            singletonAudio.currentTime = serverPositionRef.current || 0;
-            if (isPlaying) singletonAudio.play().catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
-  }, [currentSong?.id, currentSong?.bvid]);
-
-  /** Load B站 audio through proxy (B站 CDN requires Referer: bilibili.com) */
-  function loadBiliAudio(a: HTMLAudioElement, rawUrl: string) {
-    errorRetries.current = 0;
-
-    // 通过服务器代理请求 B站 CDN，代理添加 Referer 头
-    const encoded = btoa(rawUrl);
-    a.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
-    a.currentTime = serverPositionRef.current || 0;
-    if (isPlaying) a.play().catch(() => {});
-  }
-
-  // ── Fetch lyric ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentSong) { setLyric(null); return; }
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    setPosition(0);
+    setCoverUrl(currentSong.source === "bilibili" ? currentSong.picUrl || null : null);
     setLyric(null);
-    const isBili = currentSong.source === "bilibili";
+    setCurrentLine("");
+
+    if (currentSong.source === "bilibili") {
+      void refetchBiliUrl(currentSong, isPlaying, serverPositionRef.current, playbackToken);
+      return;
+    }
+
+    const detailParams = new URLSearchParams();
+    detailParams.set("id", String(currentSong.id));
+    fetch(apiUrl(`/api/music/song/detail?${detailParams.toString()}`))
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.picUrl) setCoverUrl(data.picUrl);
+      })
+      .catch(() => {});
+
+    const params = new URLSearchParams();
+    params.set("id", String(currentSong.id));
+    fetch(apiUrl(`/api/music/song?${params.toString()}`))
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.url || !singletonAudio || playbackToken !== singletonPlaybackToken) return;
+
+        singletonAudio.src = String(data.url).replace(/^http:/, "https:");
+        singletonAudio.currentTime = serverPositionRef.current || 0;
+        if (isPlaying) singletonAudio.play().catch(() => {});
+      })
+      .catch(() => {});
+  }, [currentSong, isPlaying]);
+
+  useEffect(() => {
+    if (!currentSong) return;
+
     const lyricParams = new URLSearchParams();
-    if (isBili) {
+    if (currentSong.source === "bilibili") {
       lyricParams.set("source", "bilibili");
     } else {
       lyricParams.set("id", String(currentSong.id));
     }
-    fetch(apiUrl(`/api/music/lyric?${lyricParams.toString()}`))
-      .then((r) => r.json())
-      .then((d) => { if (d.lyric) setLyric(d.lyric); })
-      .catch(() => {});
-  }, [currentSong?.id, currentSong?.bvid]);
 
-  // ── Play/pause sync ────────────────────────────────────────────────
+    fetch(apiUrl(`/api/music/lyric?${lyricParams.toString()}`))
+      .then((response) => response.json())
+      .then((data) => setLyric(data.lyric || null))
+      .catch(() => {});
+  }, [currentSong]);
+
   useEffect(() => {
-    const a = getAudio(); if (!a.src) return;
-    if (isPlaying && a.paused) a.play().catch(() => {});
-    else if (!isPlaying && !a.paused) a.pause();
+    const audio = getAudio();
+    if (!audio.src) return;
+
+    if (isPlaying && audio.paused) {
+      audio.play().catch(() => {});
+    } else if (!isPlaying && !audio.paused) {
+      audio.pause();
+    }
   }, [isPlaying]);
 
-  // ── Parse LRC and track current line ───────────────────────────────
   useEffect(() => {
-    if (!lyric) { setCurrentLine(""); return; }
-    const lines = lyric.split("\n").map((l) => {
-      const m = l.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
-      if (!m) return null;
-      return { time: parseInt(m[1]) * 60 + parseFloat(m[2]), text: m[3].trim() };
-    }).filter(Boolean) as { time: number; text: string }[];
+    if (!lyric) {
+      setCurrentLine("");
+      return;
+    }
 
-    if (lines.length === 0) { setCurrentLine(""); return; }
+    const lines = lyric
+      .split("\n")
+      .map((line) => {
+        const match = line.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+        if (!match) return null;
+        return {
+          time: parseInt(match[1], 10) * 60 + parseFloat(match[2]),
+          text: match[3].trim(),
+        };
+      })
+      .filter(Boolean) as Array<{ time: number; text: string }>;
 
-    const a = getAudio();
+    if (lines.length === 0) {
+      setCurrentLine("");
+      return;
+    }
+
+    const audio = getAudio();
     const update = () => {
-      const t = a.currentTime;
-      const line = lines.reduce((prev, curr) => (curr.time <= t ? curr : prev), lines[0]);
+      const current = audio.currentTime;
+      const line = lines.reduce((prev, entry) => (entry.time <= current ? entry : prev), lines[0]);
       setCurrentLine(line.text || "");
     };
+
     update();
-    a.addEventListener("timeupdate", update);
-    return () => a.removeEventListener("timeupdate", update);
+    audio.addEventListener("timeupdate", update);
+    return () => audio.removeEventListener("timeupdate", update);
   }, [lyric]);
 
-  // ── Progress sync (server is single source of truth) ───────────────
-  // Seek to server position when drift exceeds 1.5s.
-  // Verification is deferred because seeking completes asynchronously.
   useEffect(() => {
-    const a = getAudio();
-    if (!a.src) return;
-    const drift = Math.abs(a.currentTime - serverPosition);
+    const audio = getAudio();
+    if (!audio.src) return;
+
+    const drift = Math.abs(audio.currentTime - serverPosition);
     if (drift > 1.5 && seekFailCount.current < 10) {
-      a.currentTime = serverPosition;
-      // Deferred check — browser may need a frame to actually apply the seek
-      const serverAtCall = serverPosition;
-      setTimeout(() => {
-        if (Math.abs(a.currentTime - serverAtCall) > 3) {
-          seekFailCount.current++;
+      audio.currentTime = serverPosition;
+      window.setTimeout(() => {
+        if (Math.abs(audio.currentTime - serverPosition) > 3) {
+          seekFailCount.current += 1;
         }
       }, 600);
     }
   }, [serverPosition]);
 
-  const dur = currentSong?.duration || 0;
-  // Progress bar: server position is authoritative.
-  // CSS transition (duration-1000) smoothly bridges 2s polling gaps.
-  const barPos = serverPosition || position;
-  const pct = dur > 0 ? Math.min((barPos / dur) * 100, 100) : 0;
+  const duration = currentSong?.duration || 0;
+  const progressPosition = serverPosition || position;
+  const progress = duration > 0 ? Math.min((progressPosition / duration) * 100, 100) : 0;
+  const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <div className="flex w-full max-w-lg flex-col items-center space-y-4">
-      <div className="flex flex-wrap justify-center gap-1.5">
-        {activeUsers.map(u => {
-          const isCur = u.id === currentUserId;
-          return (
-            <div key={u.id} className="relative flex flex-col items-center">
-              <div className={`rounded-full ${isCur?"ring-2 ring-primary animate-pulse":""}`}>
-                <Avatar className={`h-9 w-9 ${isCur?"":"opacity-60"}`}>
-                  <AvatarImage src={u.avatar||""} />
-                  <AvatarFallback className="text-[11px]">{u.username.slice(0,2).toUpperCase()}</AvatarFallback>
-                </Avatar>
+    <div className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+        <Card className="overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(135deg,rgba(19,32,28,0.95),rgba(31,45,41,0.88))] text-white shadow-[0_25px_80px_-40px_rgba(0,0,0,0.65)] dark:bg-[linear-gradient(135deg,rgba(17,24,39,0.98),rgba(25,35,49,0.92))]">
+          <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
+            {currentSong ? (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-5 sm:flex-row">
+                  <div className="relative h-40 w-40 shrink-0 overflow-hidden rounded-[24px] border border-white/10 bg-white/8 shadow-[0_18px_60px_-32px_rgba(0,0,0,0.65)]">
+                    {coverUrl ? (
+                      <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-5xl">🎵</div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-white/80">
+                      {sourceLabel}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="border-white/10 bg-white/10 text-white">
+                          {isPlaying ? "同步播放中" : "已暂停"}
+                        </Badge>
+                        {songSubmittedBy && (
+                          <Badge variant="outline" className="border-white/20 bg-transparent text-white/85">
+                            点歌人 {songSubmittedBy.username}
+                          </Badge>
+                        )}
+                      </div>
+                      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{currentSong.name}</h2>
+                      <p className="text-sm text-white/80 sm:text-base">{currentSong.artists}</p>
+                      <p className="text-xs text-white/55">{currentSong.album}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/12">
+                        <div className="h-full rounded-full bg-[linear-gradient(90deg,#f6d365,#fda085)] transition-all duration-1000" style={{ width: `${progress}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-white/65">
+                        <span className="font-mono tabular-nums">{fmt(progressPosition)}</span>
+                        <span className="font-mono tabular-nums">{fmtTotal(duration)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-900 hover:bg-white/90">
+                        投票切歌 {skipVotes}/{skipThreshold}
+                      </Button>
+                      {isCurrentUserSong && (
+                        <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/20 bg-white/8 text-white hover:bg-white/14">
+                          我直接跳过
+                        </Button>
+                      )}
+                      <div className="ml-auto flex items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 py-2 text-xs text-white/75">
+                        <span>音量</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={volume}
+                          onChange={(event) => {
+                            const nextVolume = Number(event.target.value);
+                            setVolume(nextVolume);
+                            localStorage.setItem("music-volume", String(nextVolume));
+                          }}
+                          className="h-1 w-24 cursor-pointer accent-orange-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="bg-white/12" />
+
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,0.9fr)]">
+                  <div className="rounded-[22px] border border-white/10 bg-black/18 px-4 py-4">
+                    <p className="mb-2 text-[11px] uppercase tracking-[0.24em] text-white/45">Now Singing</p>
+                    <p className="min-h-[3rem] text-lg leading-7 text-white/88 italic">
+                      {currentLine || "当前歌曲没有歌词，或者歌词还没加载出来。"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-black/18 px-4 py-4">
+                    <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-white/45">Turn Owner</p>
+                    {songSubmittedBy ? (
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 border border-white/15">
+                          <AvatarImage src={songSubmittedBy.avatar || ""} />
+                          <AvatarFallback>{songSubmittedBy.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-sm font-medium text-white">{songSubmittedBy.username}</div>
+                          <div className="text-xs text-white/55">当前轮播拥有者</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/55">还没有歌曲进入轮播。</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              {isCur && <div className="absolute -bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary" />}
-              <span className="mt-0.5 text-[10px] text-muted-foreground">{u.username}</span>
-            </div>
-          );
-        })}
-        {activeUsers.length===0 && <p className="py-4 text-xs text-muted-foreground">还没有人加入音乐室</p>}
-      </div>
-
-      {currentSong ? (
-        <div className="w-full space-y-3">
-          <div className="flex gap-3 rounded-xl bg-card p-4 shadow-sm">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-              {coverUrl ? <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" /> : <span className="text-2xl">🎵</span>}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col justify-center">
-              <h2 className="truncate text-base font-bold">{currentSong.name}</h2>
-              <p className="truncate text-sm text-muted-foreground">{currentSong.artists}</p>
-              <p className="truncate text-xs text-muted-foreground/70">{currentSong.album}</p>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div className="h-full rounded-full bg-primary transition-all duration-1000" style={{width:`${pct}%`}} />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{fmt(barPos)}</span><span>{fmtTotal(dur)}</span>
-            </div>
-          </div>
-
-          {/* Lyrics */}
-          {currentLine && (
-            <div className="rounded-lg bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground italic">
-              {currentLine}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" onClick={onSkipVote} className="text-xs">⏭ 切歌 ({skipVotes}/{skipThreshold})</Button>
-            {isCurrentUserSong && (
-              <Button variant="ghost" size="sm" onClick={onForceSkip} className="text-xs text-destructive">跳过</Button>
+            ) : (
+              <div className="flex min-h-[22rem] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/16 bg-black/12 px-6 text-center">
+                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/6 text-4xl shadow-[0_10px_40px_-20px_rgba(0,0,0,0.7)]">
+                  🎧
+                </div>
+                <p className="text-xl font-medium text-white">房间已开，但还没人把音乐推上舞台。</p>
+                <p className="mt-2 max-w-md text-sm leading-6 text-white/60">
+                  先在右侧搜索或导入收藏夹，再加入房间。现在的轮播逻辑已经改成播完自动把歌挪到队尾，更像持续播放的歌单。
+                </p>
+              </div>
             )}
-            <div className="flex items-center gap-1">
-              <span className="text-xs">🔊</span>
-              <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e => { const v = Number(e.target.value); setVolume(v); localStorage.setItem("music-volume", String(v)); }} className="h-1 w-16 cursor-pointer accent-primary" />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[28px] border border-border/60 bg-background/90 shadow-[0_18px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+          <CardContent className="px-4 py-5 sm:px-5 sm:py-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Room Presence</p>
+                <h3 className="mt-1 text-lg font-semibold">当前在场的人</h3>
+              </div>
+              <Badge variant="outline">{activeUsers.length} 位</Badge>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="w-full max-w-sm rounded-xl border-2 border-dashed border-muted p-10 text-center">
-          <div className="mb-3 flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50"><span className="text-3xl">🎧</span></div></div>
-          <h3 className="text-sm font-medium text-muted-foreground">等待音乐</h3>
-          <p className="mt-1 text-xs text-muted-foreground/60">从右侧添加歌曲到你的歌单，加入音乐室即可自动播放</p>
-        </div>
-      )}
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {activeUsers.length > 0 ? (
+                activeUsers.map((user) => {
+                  const isCurrent = user.id === currentUserId;
+                  return (
+                    <div key={user.id} className={`flex items-center gap-3 rounded-[22px] border px-3 py-3 ${isCurrent ? "border-primary/40 bg-primary/8" : "border-border/60 bg-muted/30"}`}>
+                      <div className="relative">
+                        <Avatar className={`h-11 w-11 ${isCurrent ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}>
+                          <AvatarImage src={user.avatar || ""} />
+                          <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        {isCurrent && <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{user.username}</div>
+                        <div className="text-xs text-muted-foreground">{isCurrent ? "正在占据当前轮次" : "等待轮到"}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-[22px] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                  房间里还没有人，先加入再说。
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
+}
+
+async function refetchBiliUrl(song: Song, isPlaying: boolean, serverPosition: number, playbackToken: number) {
+  const params = new URLSearchParams();
+  params.set("source", "bilibili");
+  params.set("bvid", song.bvid || "");
+  params.set("cid", String(song.cid ?? ""));
+
+  try {
+    const response = await fetch(apiUrl(`/api/music/song?${params.toString()}`));
+    const data = await response.json();
+    if (!data.url || !singletonAudio || playbackToken !== singletonPlaybackToken) return;
+    loadBiliAudio(singletonAudio, String(data.url), isPlaying, serverPosition);
+  } catch {}
+}
+
+function loadBiliAudio(audio: HTMLAudioElement, rawUrl: string, isPlaying: boolean, serverPosition: number) {
+  const encoded = btoa(rawUrl);
+  audio.src = apiUrl(`/api/music/stream?url=${encodeURIComponent(encoded)}`);
+  audio.currentTime = serverPosition || 0;
+  if (isPlaying) audio.play().catch(() => {});
 }
