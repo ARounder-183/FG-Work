@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { compare } from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { signToken } from "@/lib/auth";
+import { buildAuthUser, signToken } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,9 +33,7 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
-    return Response.json({
-      user: { id: user.id, username: user.username, avatar: user.avatar, bio: user.bio },
-    });
+    return Response.json({ user: await buildAuthUser(user.id) });
   } catch {
     return Response.json({ error: "登录失败，请稍后重试" }, { status: 500 });
   }

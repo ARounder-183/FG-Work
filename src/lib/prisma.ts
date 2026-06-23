@@ -6,8 +6,21 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const dbPath = path.resolve(process.cwd(), "dev.db");
-const adapter = new PrismaLibSql({ url: `file:${dbPath}` });
+function resolveDatabaseUrl() {
+  const configured = process.env.DATABASE_URL;
+  if (configured) {
+    if (configured.startsWith("file:")) {
+      const relativePath = configured.slice("file:".length);
+      return `file:${path.resolve(process.cwd(), relativePath)}`;
+    }
+
+    return configured;
+  }
+
+  return `file:${path.resolve(process.cwd(), "dev.db")}`;
+}
+
+const adapter = new PrismaLibSql({ url: resolveDatabaseUrl() });
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 

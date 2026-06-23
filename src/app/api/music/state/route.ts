@@ -12,7 +12,7 @@ export async function GET() {
 
     // ── 心跳：更新当前用户 lastSeenAt，踢出超时用户 ──────────────────
     const currentUser = await getCurrentUser();
-    if (currentUser) {
+    if (currentUser && (!currentUser.lastSeenAt || Date.now() - new Date(currentUser.lastSeenAt).getTime() > 20_000)) {
       await prisma.user.update({
         where: { id: currentUser.id },
         data: { lastSeenAt: new Date() },
@@ -29,6 +29,13 @@ export async function GET() {
 
       const stale = queueOrder.filter((id) => !activeSet.has(id));
       if (stale.length > 0) {
+        const currentSong = state.currentUserSongId
+          ? await prisma.userSong.findUnique({
+              where: { id: state.currentUserSongId },
+              select: { userId: true },
+            })
+          : null;
+
         // Remove stale users from queue
         const updatedOrder = queueOrder.filter((id) => activeSet.has(id));
         await prisma.musicState.update({
@@ -46,6 +53,10 @@ export async function GET() {
         });
         await prisma.skipVote.deleteMany({ where: { userId: { in: stale } } });
 
+        if (currentSong && stale.includes(currentSong.userId)) {
+          await advanceToNextSong();
+        }
+
         // Refresh state after cleanup
         state = (await prisma.musicState.findUnique({ where: { id: "singleton" } }))!;
         // Re-parse queueOrder after cleanup
@@ -61,14 +72,6 @@ export async function GET() {
       state = await prisma.musicState.update({
         where: { id: "singleton" },
         data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0, startedAt: null },
-      });
-    }
-
-    // 清理已离开用户的歌曲
-    if (queueOrder.length > 0) {
-      await prisma.userSong.updateMany({
-        where: { played: false, userId: { notIn: queueOrder } },
-        data: { played: true },
       });
     }
 

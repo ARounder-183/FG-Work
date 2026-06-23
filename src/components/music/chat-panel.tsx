@@ -32,7 +32,10 @@ export function ChatPanel() {
   const isSpeaking = useRef(false);
   const speakQueue = useRef<string[]>([]);
   const ttsVolumeRef = useRef(ttsVolume);
-  ttsVolumeRef.current = ttsVolume;
+
+  useEffect(() => {
+    ttsVolumeRef.current = ttsVolume;
+  }, [ttsVolume]);
 
   const fetchMessages = async () => {
     const res = await fetch(apiUrl("/api/chat"));
@@ -96,9 +99,21 @@ export function ChatPanel() {
   };
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled || document.hidden) return;
+      await fetchMessages();
+    };
+
+    void run();
+    const interval = window.setInterval(() => {
+      void run();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {

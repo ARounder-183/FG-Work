@@ -74,10 +74,7 @@ export async function advanceToNextSong(): Promise<void> {
 
   // 标记当前歌曲已播放（如果存在）
   if (state.currentUserSongId) {
-    await prisma.userSong.updateMany({
-      where: { id: state.currentUserSongId, played: false },
-      data: { played: true },
-    });
+    await markSongPlayed(state.currentUserSongId);
     await prisma.skipVote.deleteMany({
       where: { songId: state.currentUserSongId },
     });
@@ -175,9 +172,24 @@ async function setCurrentSong(
 }
 
 async function markSongPlayed(songId: string): Promise<void> {
-  await prisma.userSong.updateMany({
-    where: { id: songId, played: false },
-    data: { played: true },
+  const song = await prisma.userSong.findUnique({
+    where: { id: songId },
+    select: { id: true, userId: true, sortOrder: true },
+  });
+  if (!song) return;
+
+  const maxOrder = await prisma.userSong.findFirst({
+    where: { userId: song.userId },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
+
+  await prisma.userSong.update({
+    where: { id: songId },
+    data: {
+      played: true,
+      sortOrder: Math.max(maxOrder?.sortOrder ?? song.sortOrder, song.sortOrder) + 1,
+    },
   });
 }
 

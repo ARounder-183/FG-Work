@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { formatLocalDateKey } from "@/lib/study";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Group by date, sum durations
     const map = new Map<string, number>();
     for (const r of records) {
-      const key = r.date.toISOString().slice(0, 10);
+      const key = formatLocalDateKey(r.date);
       map.set(key, (map.get(key) || 0) + r.duration);
     }
 

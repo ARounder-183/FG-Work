@@ -45,7 +45,7 @@ export function BilibiliLogin({ open, onClose, onLoginSuccess }: Props) {
 
   // Poll login status
   useEffect(() => {
-    if (!qrKey || status !== "waiting" || !open) return;
+    if (!qrKey || (status !== "waiting" && status !== "scanned") || !open) return;
 
     pollRef.current = setInterval(async () => {
       try {

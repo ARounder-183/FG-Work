@@ -2,6 +2,7 @@
 
 import { apiUrl } from "@/lib/url";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "./auth-provider";
 
 interface ActiveCheckIn {
@@ -26,11 +27,16 @@ const StudyContext = createContext<StudyContextType>({
 
 export function StudyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [active, setActive] = useState<ActiveCheckIn | null>(null);
   const [todayMinutes, setTodayMinutes] = useState(0);
 
   const refreshStudy = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setActive(null);
+      setTodayMinutes(0);
+      return;
+    }
     try {
       const [activeRes, todayRes] = await Promise.all([
         fetch(apiUrl("/api/checkin/active")),
@@ -57,10 +63,17 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    refreshStudy();
-    const interval = setInterval(refreshStudy, 10000);
-    return () => clearInterval(interval);
-  }, [refreshStudy]);
+    if (!user || pathname === "/study") return;
+
+    void refreshStudy();
+    const interval = window.setInterval(() => {
+      if (!document.hidden) {
+        void refreshStudy();
+      }
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, [pathname, refreshStudy, user]);
 
   return (
     <StudyContext.Provider value={{ active, todayMinutes, refreshStudy }}>

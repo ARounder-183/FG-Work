@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "concurrently -n next,ncm -c blue,green \"next dev\" \"cross-env PORT=4000 node node_modules/@neteasecloudmusicapienhanced/api/app.js\"",
     "dev:next": "next dev",
-    "build": "next build",
+    "prisma:generate": "prisma generate",
+    "build": "npm run prisma:generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "npm run prisma:generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

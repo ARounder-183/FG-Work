@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     if (toAdd.length === 0) return Response.json({ error: "请选择歌曲" }, { status: 400 });
 
     const maxOrder = await prisma.userSong.findFirst({
+      where: { userId: user.id },
       orderBy: { sortOrder: "desc" },
       select: { sortOrder: true },
     });

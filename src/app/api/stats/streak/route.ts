@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { formatLocalDateKey } from "@/lib/study";
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
     // Group by date, calculate total per day
     const dailyMap = new Map<string, number>();
     for (const r of records) {
-      const key = r.date.toISOString().slice(0, 10);
+      const key = formatLocalDateKey(r.date);
       dailyMap.set(key, (dailyMap.get(key) || 0) + r.duration);
     }
 
@@ -23,18 +24,18 @@ export async function GET() {
       .sort((a, b) => b.date.localeCompare(a.date));
 
     // Calculate current streak (consecutive days from today backwards)
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatLocalDateKey(new Date());
     const dateSet = new Set(days.map((d) => d.date));
 
     let streak = 0;
-    let checkDate = new Date();
+    const checkDate = new Date();
     // Check if today has records, else start from yesterday
     if (!dateSet.has(today)) {
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
     while (true) {
-      const d = checkDate.toISOString().slice(0, 10);
+      const d = formatLocalDateKey(checkDate);
       if (dateSet.has(d)) {
         streak++;
         checkDate.setDate(checkDate.getDate() - 1);

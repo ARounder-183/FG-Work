@@ -42,6 +42,7 @@ export default function StudyPage() {
   const [newIcon, setNewIcon] = useState("📌");
   const [creating, setCreating] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hiddenTimeoutRef = useRef<number | null>(null);
 
   const fetchTopics = async () => {
     const res = await fetch(apiUrl("/api/topics"));
@@ -102,20 +103,34 @@ export default function StudyPage() {
         navigator.sendBeacon(apiUrl("/api/checkin/stop"));
       }
     };
-    window.addEventListener("beforeunload", stopIfActive);
-    window.addEventListener("visibilitychange", () => {
-      // If hidden for > 30min, stop on next visibility
-      if (document.hidden && active) {
-        const timeout = setTimeout(async () => {
+
+    const handleVisibilityChange = () => {
+      if (!active) return;
+
+      if (document.hidden) {
+        hiddenTimeoutRef.current = window.setTimeout(async () => {
           await fetch(apiUrl("/api/checkin/stop"), { method: "POST" });
           window.location.reload();
         }, 30 * 60 * 1000);
-        const onVisible = () => { clearTimeout(timeout); document.removeEventListener("visibilitychange", onVisible); };
-        document.addEventListener("visibilitychange", onVisible, { once: true });
+        return;
       }
-    });
+
+      if (hiddenTimeoutRef.current !== null) {
+        window.clearTimeout(hiddenTimeoutRef.current);
+        hiddenTimeoutRef.current = null;
+      }
+    };
+
+    window.addEventListener("beforeunload", stopIfActive);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       window.removeEventListener("beforeunload", stopIfActive);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (hiddenTimeoutRef.current !== null) {
+        window.clearTimeout(hiddenTimeoutRef.current);
+        hiddenTimeoutRef.current = null;
+      }
     };
   }, [active]);
 

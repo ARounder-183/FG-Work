@@ -1,9 +1,8 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ensureTimerRunning } from "@/lib/music-server";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     const user = await requireAuth();
 

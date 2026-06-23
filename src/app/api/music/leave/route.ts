@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { stopTimer } from "@/lib/music-server";
+import { advanceToNextSong, stopTimer } from "@/lib/music-server";
 
 export async function POST() {
   try {
@@ -34,6 +34,13 @@ export async function POST() {
       data: { played: true },
     });
 
+    const currentSong = state.currentUserSongId
+      ? await prisma.userSong.findUnique({
+          where: { id: state.currentUserSongId },
+          select: { userId: true },
+        })
+      : null;
+
     // 无人时停止时钟并清除播放
     if (updated.length === 0) {
       stopTimer();
@@ -41,6 +48,8 @@ export async function POST() {
         where: { id: "singleton" },
         data: { currentSong: null, currentUserSongId: null, isPlaying: false, position: 0, startedAt: null },
       });
+    } else if (currentSong?.userId === user.id) {
+      await advanceToNextSong();
     }
 
     return Response.json({ success: true });

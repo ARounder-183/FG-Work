@@ -1,25 +1,23 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { closeActiveCheckIn } from "@/lib/study";
 
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
 
-    // End any existing active check-in first
-    const existing = await prisma.checkIn.findFirst({
-      where: { userId: user.id, endedAt: null },
-    });
-    if (existing) {
-      const duration = Math.round((Date.now() - new Date(existing.startedAt).getTime()) / 1000);
-      await prisma.checkIn.update({
-        where: { id: existing.id },
-        data: { endedAt: new Date(), duration },
-      });
-    }
-
     const { topicId } = await req.json();
     if (!topicId) return Response.json({ error: "请选择主题" }, { status: 400 });
+
+    const topic = await prisma.studyTopic.findFirst({
+      where: { id: topicId, userId: user.id },
+    });
+    if (!topic) {
+      return Response.json({ error: "主题不存在" }, { status: 404 });
+    }
+
+    await closeActiveCheckIn(user.id);
 
     const checkIn = await prisma.checkIn.create({
       data: { userId: user.id, topicId },

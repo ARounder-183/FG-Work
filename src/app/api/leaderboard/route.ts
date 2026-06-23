@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   const userMap = new Map(users.map((u) => [u.id, u]));
 
-  const rankings = userStats
+  const allRankings = userStats
     .map((s) => {
       const user = userMap.get(s.userId);
       return {
@@ -49,8 +49,9 @@ export async function GET(req: NextRequest) {
       };
     })
     .sort((a, b) => b.totalSeconds - a.totalSeconds)
-    .slice(0, 100)
     .map((item, index) => ({ ...item, rank: index + 1 }));
+
+  const rankings = allRankings.slice(0, 100);
 
   // Topic distribution (global)
   const topicStats = await prisma.studyRecord.groupBy({
@@ -84,16 +85,10 @@ export async function GET(req: NextRequest) {
   const currentUser = await getCurrentUser();
   let myRank: { rank: number; totalSeconds: number } | null = null;
   if (currentUser) {
-    const userAgg = await prisma.studyRecord.aggregate({
-      where: { userId: currentUser.id, ...dateFilter },
-      _sum: { duration: true },
-    });
-    const myTotal = userAgg._sum.duration || 0;
-    const position = rankings.findIndex((r) => r.userId === currentUser.id);
-    myRank = {
-      rank: position >= 0 ? position + 1 : rankings.length + 1,
-      totalSeconds: myTotal,
-    };
+    const current = allRankings.find((item) => item.userId === currentUser.id);
+    myRank = current
+      ? { rank: current.rank, totalSeconds: current.totalSeconds }
+      : { rank: allRankings.length + 1, totalSeconds: 0 };
   }
 
   return Response.json({ rankings, topicDistribution, myRank });

@@ -4,7 +4,7 @@ import { mkdir } from "fs/promises";
 import path from "path";
 import { pipeline } from "stream/promises";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { buildAuthUser, requireAuth } from "@/lib/auth";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -31,13 +31,12 @@ export async function POST(req: NextRequest) {
     await pipeline(stream as never, writeStream);
 
     const avatarUrl = `${BASE}/api/static/avatars/${filename}`;
-    const updated = await prisma.user.update({
+    await prisma.user.update({
       where: { id: user.id },
       data: { avatar: avatarUrl },
-      select: { id: true, username: true, avatar: true, bio: true },
     });
 
-    return Response.json({ user: updated });
+    return Response.json({ user: await buildAuthUser(user.id) });
   } catch (err) {
     if (err instanceof Response) return err;
     return Response.json({ error: "上传失败" }, { status: 500 });

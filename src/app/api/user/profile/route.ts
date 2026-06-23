@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { buildAuthUser, requireAuth } from "@/lib/auth";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -18,16 +17,15 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const updated = await prisma.user.update({
+    await prisma.user.update({
       where: { id: user.id },
       data: {
         ...(username !== undefined && { username }),
         ...(bio !== undefined && { bio }),
       },
-      select: { id: true, username: true, avatar: true, bio: true },
     });
 
-    return Response.json({ user: updated });
+    return Response.json({ user: await buildAuthUser(user.id) });
   } catch (err) {
     if (err instanceof Response) return err;
     return Response.json({ error: "更新失败" }, { status: 500 });

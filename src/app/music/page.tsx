@@ -67,7 +67,23 @@ export default function MusicPage() {
   }, [user]);
 
   useEffect(() => { fetchState(); fetchMySongs(); }, [fetchState, fetchMySongs]);
-  useEffect(() => { const i = setInterval(() => { fetchState(); fetchMySongs(); }, 1500); return () => clearInterval(i); }, [fetchState, fetchMySongs]);
+  useEffect(() => {
+    const stateInterval = window.setInterval(() => {
+      if (!document.hidden) {
+        void fetchState();
+      }
+    }, 3000);
+    const queueInterval = window.setInterval(() => {
+      if (!document.hidden && user) {
+        void fetchMySongs();
+      }
+    }, 12000);
+
+    return () => {
+      window.clearInterval(stateInterval);
+      window.clearInterval(queueInterval);
+    };
+  }, [fetchMySongs, fetchState, user]);
 
   // Check Bilibili login status
   useEffect(() => {
@@ -91,16 +107,16 @@ export default function MusicPage() {
   }, [joined]);
 
   const api = {
-    join: async () => { await fetch(apiUrl("/api/music/join"), { method: "POST" }); setJoined(true); fetchState(); toast.success("已加入"); },
-    leave: async () => { await fetch(apiUrl("/api/music/leave"), { method: "POST" }); setJoined(false); setCurrentSong(null); setIsPlaying(false); fetchState(); },
-    skipVote: async () => { const r = await fetch(apiUrl("/api/music/skip"), { method: "POST" }); const d = await r.json(); toast(d.skipped ? "已跳过" : `投票 (${d.voteCount}/${d.threshold})`); fetchState(); fetchMySongs(); },
-    forceSkip: async () => { const r = await fetch(apiUrl("/api/music/skip?force=true"), { method: "POST" }); const d = await r.json(); if (d.skipped) { toast.success("已跳过"); fetchState(); fetchMySongs(); } else toast.error(d.error); },
-    addSong: async (s: Song) => { const r = await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ song: s }) }); if (r.ok) { toast.success("已添加"); fetchMySongs(); fetchState(); } },
-    addSongs: async (songs: Song[]) => { await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs }) }); toast.success(`已添加 ${songs.length} 首`); fetchMySongs(); fetchState(); },
-    reorder: async (s: { id: string; sortOrder: number }[]) => { await fetch(apiUrl("/api/music/queue"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs: s }) }); fetchMySongs(); },
-    clear: async () => { await fetch(apiUrl("/api/music/queue?all=true"), { method: "DELETE" }); fetchMySongs(); toast.success("已清空"); },
+    join: async () => { await fetch(apiUrl("/api/music/join"), { method: "POST" }); setJoined(true); void fetchState(); void fetchMySongs(); toast.success("已加入"); },
+    leave: async () => { await fetch(apiUrl("/api/music/leave"), { method: "POST" }); setJoined(false); setCurrentSong(null); setIsPlaying(false); void fetchState(); },
+    skipVote: async () => { const r = await fetch(apiUrl("/api/music/skip"), { method: "POST" }); const d = await r.json(); toast(d.skipped ? "已跳过" : `投票 (${d.voteCount}/${d.threshold})`); void fetchState(); void fetchMySongs(); },
+    forceSkip: async () => { const r = await fetch(apiUrl("/api/music/skip?force=true"), { method: "POST" }); const d = await r.json(); if (d.skipped) { toast.success("已跳过"); void fetchState(); void fetchMySongs(); } else toast.error(d.error); },
+    addSong: async (s: Song) => { const r = await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ song: s }) }); if (r.ok) { toast.success("已添加"); void fetchMySongs(); void fetchState(); } },
+    addSongs: async (songs: Song[]) => { await fetch(apiUrl("/api/music/queue"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs }) }); toast.success(`已添加 ${songs.length} 首`); void fetchMySongs(); void fetchState(); },
+    reorder: async (s: { id: string; sortOrder: number }[]) => { await fetch(apiUrl("/api/music/queue"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ songs: s }) }); void fetchMySongs(); },
+    clear: async () => { await fetch(apiUrl("/api/music/queue?all=true"), { method: "DELETE" }); void fetchMySongs(); toast.success("已清空"); },
     randomize: async () => { const arr = [...mySongs].map((_, i) => ({ id: mySongs[i].id, sortOrder: i })).sort(() => Math.random() - 0.5); await api.reorder(arr.map((x, i) => ({ id: x.id, sortOrder: i }))); toast.success("已随机"); },
-    deleteSong: async (id: string) => { await fetch(apiUrl(`/api/music/queue?id=${id}`), { method: "DELETE" }); fetchMySongs(); toast.success("已删除"); },
+    deleteSong: async (id: string) => { await fetch(apiUrl(`/api/music/queue?id=${id}`), { method: "DELETE" }); void fetchMySongs(); toast.success("已删除"); },
   };
 
   if (loading) return <div className="mx-auto max-w-5xl px-4 py-8"><Skeleton className="h-96 w-full" /></div>;

@@ -4,6 +4,47 @@ import { apiUrl } from "@/lib/url";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+interface TencentCaptchaResult {
+  ret: number;
+  ticket?: string;
+  randstr?: string;
+}
+
+interface GeetestValidateResult {
+  geetest_challenge: string;
+  geetest_validate: string;
+  geetest_seccode: string;
+}
+
+interface GeetestInstance {
+  appendTo: (element: HTMLElement) => void;
+  onSuccess: (callback: () => void) => void;
+  onError: (callback: () => void) => void;
+  onClose: (callback: () => void) => void;
+  getValidate: () => GeetestValidateResult;
+}
+
+declare global {
+  interface Window {
+    TencentCaptcha?: new (
+      appid: string,
+      callback: (result: TencentCaptchaResult) => void,
+    ) => { show: () => void };
+    initGeetest?: (
+      config: {
+        gt: string;
+        challenge: string;
+        offline: boolean;
+        new_captcha: boolean;
+        product: string;
+        https: boolean;
+        width: string;
+      },
+      callback: (instance: GeetestInstance) => void,
+    ) => void;
+  }
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -78,9 +119,9 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
     const script = document.createElement("script");
     script.src = "https://t.captcha.qq.com/TCaptcha.js";
     script.onload = () => {
-      const C = (window as any).TencentCaptcha;
+      const C = window.TencentCaptcha;
       if (!C) { clearCaptchaTimeout(); setSending(false); setError("验证组件加载失败"); return; }
-      new C(appid, (res: any) => {
+      new C(appid, (res) => {
         console.log("[tcaptcha]", res);
         clearCaptchaTimeout();
         if (res.ret === 0 && res.ticket) {
@@ -109,7 +150,7 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
     const script = document.createElement("script");
     script.src = "https://static.geetest.com/static/js/gt.0.4.9.js";
     script.onload = () => {
-      const init = (window as any).initGeetest;
+      const init = window.initGeetest;
       if (!init) { cleanupGeetest(); clearCaptchaTimeout(); setSending(false); setError("验证组件加载失败"); return; }
       try {
         // 参数完全匹配 BBPlayer
@@ -121,7 +162,7 @@ export function PhoneLogin({ open, onClose, onLoginSuccess }: Props) {
           product: "popup",
           https: true,
           width: "100%",
-        }, (obj: any) => {
+        }, (obj) => {
           obj.appendTo(box);
           obj.onSuccess(() => {
             clearCaptchaTimeout();
