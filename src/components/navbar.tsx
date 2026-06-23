@@ -35,10 +35,7 @@ export function Navbar() {
   const [elapsed, setElapsed] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   const toggleTheme = (e: React.MouseEvent) => {
     const x = e.clientX;
@@ -82,9 +79,9 @@ export function Navbar() {
       setElapsed(Math.round((Date.now() - new Date(active.startedAt).getTime()) / 1000));
       const interval = setInterval(() => setElapsed((prev) => prev + 1), 1000);
       return () => clearInterval(interval);
+    } else {
+      setElapsed(0);
     }
-
-    setElapsed(0);
   }, [active]);
 
   const formatTimer = (seconds: number) => {
@@ -100,13 +97,14 @@ export function Navbar() {
     router.push("/");
   };
 
+  // Don't show loading state for navbar (avoids flash)
   if (loading) return null;
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
-        <div className="flex min-w-0 items-center gap-4 lg:gap-6">
-          <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-lg font-bold tracking-tight">
             FG自习室
           </Link>
           <div className="hidden items-center gap-1 md:flex">
@@ -121,13 +119,14 @@ export function Navbar() {
             ))}
           </div>
 
+          {/* Mobile hamburger */}
           <button
             className="md:hidden rounded-md p-1.5 hover:bg-accent"
             onClick={() => setMobileMenu(!mobileMenu)}
           >
             <span className="text-lg">{mobileMenu ? "✕" : "☰"}</span>
           </button>
-          {mobileMenu ? (
+          {mobileMenu && (
             <div className="absolute left-0 right-0 top-14 z-50 border-b bg-background p-2 md:hidden">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -140,32 +139,30 @@ export function Navbar() {
                 </Link>
               ))}
             </div>
-          ) : null}
+          )}
         </div>
 
-        <div className="hidden min-w-0 flex-1 items-center justify-center gap-2 lg:flex">
-          {active ? (
-            <Link href="/study" className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-sm font-mono tabular-nums text-primary animate-pulse">
+        {/* Timer */}
+        <div className="flex items-center gap-2">
+          {active && (
+            <Link href="/study" className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-sm font-mono tabular-nums text-primary animate-pulse">
               <span>{active.topicIcon}</span>
               <span>{formatTimer(elapsed)}</span>
             </Link>
-          ) : null}
-          {currentSong ? (
-            <Link
-              href="/music"
-              className="flex min-w-0 max-w-[360px] items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-700 transition hover:bg-emerald-500/15 dark:text-emerald-300"
-            >
-              <span className={`text-sm ${isPlaying ? "animate-pulse" : ""}`}>{isPlaying ? "🎵" : "⏸"}</span>
+          )}
+          {currentSong && (
+            <Link href="/music" className="flex max-w-[180px] items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs text-green-700 dark:text-green-300">
+              <span>{isPlaying ? "🎵" : "⏸️"}</span>
               <div className="min-w-0">
                 <div className="truncate font-medium">{currentSong.name}</div>
-                <div className="truncate text-[11px] text-emerald-700/75 dark:text-emerald-300/75">{currentSong.artists}</div>
+                <div className="truncate text-[11px] text-green-700/75 dark:text-green-300/75">{currentSong.artists}</div>
               </div>
             </Link>
-          ) : null}
+          )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {mounted ? (
+        <div className="flex items-center gap-2">
+          {mounted && (
             <Button
               variant="ghost"
               size="icon"
@@ -173,24 +170,30 @@ export function Navbar() {
               title={theme === "dark" ? "切换为白天模式" : "切换为黑夜模式"}
               aria-label="切换主题"
             >
-              {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
             </Button>
-          ) : null}
+          )}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={user.avatar || ""} alt={user.username} />
-                  <AvatarFallback className="text-xs">{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="text-xs">
+                    {user.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
-                <span className="hidden sm:inline">{user.username}</span>
+                <span>{user.username}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                {user.role === "admin" ? (
+                {user.role === "admin" && (
                   <DropdownMenuItem onClick={() => router.push("/admin")}>
                     管理后台
                   </DropdownMenuItem>
-                ) : null}
+                )}
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   个人中心
                 </DropdownMenuItem>
@@ -213,18 +216,6 @@ export function Navbar() {
           )}
         </div>
       </div>
-
-      {currentSong ? (
-        <div className="border-t border-border/60 bg-emerald-500/8 px-4 py-2 text-xs lg:hidden">
-          <div className="mx-auto flex max-w-7xl items-center gap-2">
-            <Link href="/music" className="flex min-w-0 flex-1 items-center gap-2 text-emerald-700 dark:text-emerald-300">
-              <span className={`text-sm ${isPlaying ? "animate-pulse" : ""}`}>{isPlaying ? "🎵" : "⏸"}</span>
-              <span className="truncate font-medium">{currentSong.name}</span>
-              <span className="truncate text-emerald-700/75 dark:text-emerald-300/75">{currentSong.artists}</span>
-            </Link>
-          </div>
-        </div>
-      ) : null}
     </nav>
   );
 }

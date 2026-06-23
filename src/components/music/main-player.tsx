@@ -433,14 +433,14 @@ export function MainPlayer({
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_19rem]">
-      <Card className="overflow-hidden rounded-[30px] border-0 bg-[linear-gradient(145deg,#09131c_0%,#10202c_48%,#162a2d_100%)] text-white shadow-[0_30px_100px_-46px_rgba(2,6,23,0.95)]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_18rem]">
+      <Card className="overflow-hidden rounded-[24px] border border-slate-800 bg-slate-950 text-white shadow-sm">
         <CardContent className="p-0">
           {currentSong ? (
-            <div className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
-              <div className="relative border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%)]" />
-                <div className="relative space-y-4">
+            <div className="grid gap-0 lg:grid-cols-[16rem_minmax(0,1fr)]">
+              <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
+                
+                <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="bg-white text-slate-950 hover:bg-white">{isPlaying ? "正在同步播放" : "暂停中"}</Badge>
                     <Badge variant="outline" className="border-white/16 bg-white/6 text-white/80">
@@ -448,7 +448,7 @@ export function MainPlayer({
                     </Badge>
                   </div>
 
-                  <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-white/6 shadow-[0_20px_60px_-32px_rgba(0,0,0,0.7)]">
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                     <div className="aspect-square">
                       {coverUrl ? (
                         <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
@@ -456,9 +456,9 @@ export function MainPlayer({
                         <div className="flex h-full items-center justify-center text-6xl">🎵</div>
                       )}
                     </div>
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgba(4,10,18,0.9)_100%)]" />
-                    <div className="absolute inset-x-0 bottom-0 px-4 py-4">
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-white/48">Current Turn</p>
+                    
+                    <div className="border-t border-white/10 px-4 py-3">
+                      <p className="text-xs text-white/60">当前轮次</p>
                       <p className="mt-2 text-sm font-medium text-white">{songSubmittedBy?.username || "房间轮播"}</p>
                       <p className="text-xs text-white/58">当前正在占据播放位</p>
                     </div>
@@ -466,53 +466,53 @@ export function MainPlayer({
                 </div>
               </div>
 
-              <div className="flex min-h-full flex-col justify-between p-5 sm:p-6">
+              <div className="flex min-h-full flex-col justify-between p-5 sm:p-5">
                 <div className="space-y-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1 space-y-2">
-                      <p className="text-[11px] uppercase tracking-[0.3em] text-white/42">Now Playing</p>
-                      <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-[2.35rem]">{currentSong.name}</h2>
+                      <p className="text-xs text-white/60">正在播放</p>
+                      <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{currentSong.name}</h2>
                       <p className="text-base text-white/76">{currentSong.artists}</p>
                       <p className="text-sm text-white/45">{currentSong.album}</p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-950 hover:bg-white/90">
+                      <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-950">
                         投票切歌 {skipVotes}/{skipThreshold}
                       </Button>
-                      {isCurrentUserSong && (
-                        <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/14 bg-white/8 text-white hover:bg-white/14">
+                      {isCurrentUserSong ? (
+                        <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/14 bg-transparent text-white">
                           直接跳过
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/18 p-4">
+                  <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
                     <div className="flex items-center justify-between text-xs text-white/56">
                       <span>播放进度</span>
                       <span className="font-mono tabular-nums">{fmt(progressPosition)} / {fmtTotal(duration)}</span>
                     </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,#f59e0b_0%,#fb7185_50%,#60a5fa_100%)] transition-all duration-700"
+                        className="h-full rounded-full bg-amber-400 transition-all duration-700"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-                    <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-white/42">当前歌词</p>
-                      <p className="mt-3 min-h-[5.5rem] text-lg leading-8 text-white/88">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                    <div className="rounded-[18px] border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs text-white/60">当前歌词</p>
+                      <p className="mt-3 min-h-[4.5rem] text-base leading-7 text-white/88">
                         {currentLine || "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
                       </p>
                     </div>
 
-                    <div className="space-y-3 rounded-[24px] border border-white/10 bg-white/6 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-white/42">房间控制</p>
-                      <div className="rounded-[18px] border border-white/10 bg-black/20 px-3 py-3">
-                        <div className="text-xs text-white/48">音量</div>
+                    <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs text-white/60">房间控制</p>
+                      <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
+                        <div className="text-xs text-white/60">音量</div>
                         <div className="mt-2 flex items-center gap-3">
                           <span className="text-xs text-white/55">静</span>
                           <input
@@ -533,7 +533,7 @@ export function MainPlayer({
                       </div>
 
                       {songSubmittedBy ? (
-                        <div className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-black/20 px-3 py-3">
+                        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
                           <Avatar className="h-11 w-11 border border-white/10">
                             <AvatarImage src={songSubmittedBy.avatar || ""} />
                             <AvatarFallback>{songSubmittedBy.username.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -550,38 +550,36 @@ export function MainPlayer({
               </div>
             </div>
           ) : (
-            <div className="flex min-h-[30rem] flex-col items-center justify-center px-6 py-12 text-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/6 text-5xl shadow-[0_18px_50px_-30px_rgba(0,0,0,0.7)]">
+            <div className="flex min-h-[24rem] flex-col items-center justify-center px-6 py-12 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-4xl">
                 🎧
               </div>
-              <p className="mt-6 text-2xl font-semibold text-white">房间已开，但舞台还是空的。</p>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-white/60">
-                先去右侧找歌并加入轮播。播完的歌曲会自动转去队尾，所以歌单会像持续滚动的房间队列，而不是一次性播空。
-              </p>
+              <p className="mt-5 text-xl font-semibold text-white">房间里还没有歌曲。</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-white/60">先去右侧加歌，播放完会自动移到队尾。</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card className="rounded-[28px] border border-white/40 bg-background/86 shadow-[0_22px_80px_-44px_rgba(15,23,42,0.5)] backdrop-blur-xl dark:border-white/8 dark:bg-white/[0.04]">
-        <CardContent className="space-y-4 p-4 sm:p-5">
+      <Card className="rounded-[24px] border border-border/60 bg-background shadow-sm">
+        <CardContent className="space-y-4 p-4">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase tracking-[0.26em] text-muted-foreground">Room Presence</p>
+            <p className="text-xs text-muted-foreground">房间成员</p>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold">当前在场的人</h3>
               <Badge variant="outline">{activeUsers.length} 位</Badge>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {activeUsers.length > 0 ? (
               activeUsers.map((user) => {
                 const isCurrent = user.id === currentUserId;
                 return (
                   <div
                     key={user.id}
-                    className={`flex items-center gap-3 rounded-[20px] border px-3 py-3 transition ${
-                      isCurrent ? "border-primary/35 bg-primary/8" : "border-border/60 bg-background/72"
+                    className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition ${
+                      isCurrent ? "border-primary/35 bg-primary/8" : "border-border/60 bg-muted/20"
                     }`}
                   >
                     <div className="relative">
@@ -593,7 +591,7 @@ export function MainPlayer({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-foreground">{user.username}</div>
-                      <div className="text-xs text-muted-foreground">{isCurrent ? "当前轮到他" : "等待轮到"}</div>
+                      <div className="text-xs text-muted-foreground">{isCurrent ? "当前轮次" : "等待中"}</div>
                     </div>
                   </div>
                 );

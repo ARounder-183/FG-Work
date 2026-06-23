@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
 interface ChatMsg {
@@ -165,17 +165,17 @@ export function ChatPanel() {
   };
 
   return (
-    <div className="grid h-[32rem] grid-rows-[auto_1fr_auto] bg-transparent">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+    <div className="grid h-[26rem] min-h-0 grid-rows-[auto_1fr_auto] bg-background lg:h-[28rem]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-4 sm:px-5">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{messages.length} 条消息</Badge>
-            <Badge variant="secondary">TTS 开启</Badge>
+            <Badge variant="secondary">TTS</Badge>
           </div>
-          <p className="text-xs text-muted-foreground">你停留在页面时，消息会持续刷新并顺序播报。</p>
+          <p className="mt-2 text-xs text-muted-foreground">消息会持续刷新，新消息按顺序播报。</p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <span>播报音量</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>音量</span>
           <input
             type="range"
             min={0}
@@ -187,14 +187,14 @@ export function ChatPanel() {
               setTtsVolume(next);
               localStorage.setItem("tts-volume", String(next));
             }}
-            className="h-1 w-20 cursor-pointer accent-primary"
+            className="h-1.5 w-24 cursor-pointer accent-primary"
           />
         </div>
       </div>
 
-      <div ref={scrollRef} className="space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+      <div ref={scrollRef} className="min-h-0 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
         {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-[22px] border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-5 text-center text-sm text-muted-foreground">
             还没有聊天记录，发一句开场白吧。
           </div>
         ) : (
@@ -211,14 +211,14 @@ export function ChatPanel() {
                   </Avatar>
                 ) : null}
 
-                <div className={`max-w-[86%] space-y-1 ${mine ? "items-end" : "items-start"}`}>
+                <div className="max-w-[86%] space-y-1">
                   {showMeta ? (
                     <div className={`flex items-center gap-2 text-xs text-muted-foreground ${mine ? "justify-end" : "justify-start"}`}>
                       <span>{message.user.username}</span>
                       <span>{formatTime(message.createdAt)}</span>
                     </div>
                   ) : null}
-                  <div className={`rounded-[20px] px-4 py-3 text-sm leading-6 shadow-sm ${mine ? "bg-foreground text-background" : "border border-border/60 bg-background"}`}>
+                  <div className={`rounded-2xl px-4 py-3 text-sm leading-6 ${mine ? "bg-primary text-primary-foreground" : "border border-border/60 bg-muted/20"}`}>
                     {message.content}
                   </div>
                 </div>
@@ -236,14 +236,14 @@ export function ChatPanel() {
       </div>
 
       {user ? (
-        <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+        <div className="border-t border-border/60 px-4 py-4 sm:px-5">
           <div className="flex gap-2">
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && void handleSend()}
-              placeholder="说点什么，让房间活起来"
-              className="h-11 border-0 bg-muted/35"
+              placeholder="说点什么"
+              className="h-11"
             />
             <Button className="h-11 px-4" onClick={() => void handleSend()} disabled={sending || !input.trim()}>
               {sending ? "发送中" : "发送"}
