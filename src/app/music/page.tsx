@@ -4,7 +4,6 @@ import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MainPlayer } from "@/components/music/main-player";
@@ -103,6 +102,8 @@ export default function MusicPage() {
   const [phoneLoginOpen, setPhoneLoginOpen] = useState(false);
   const [biliLoggedIn, setBiliLoggedIn] = useState(false);
   const [biliUname, setBiliUname] = useState("");
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const fetchMySongs = useCallback(async () => {
     if (!user) return;
@@ -304,11 +305,15 @@ export default function MusicPage() {
   if (loading) {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 lg:px-6">
-        <Skeleton className="h-[28rem] w-full rounded-[28px]" />
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,1fr)]">
-          <Skeleton className="h-[24rem] w-full rounded-[24px]" />
-          <Skeleton className="h-[32rem] w-full rounded-[24px]" />
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
         </div>
+        <Skeleton className="h-[34rem] w-full rounded-[32px]" />
       </div>
     );
   }
@@ -316,84 +321,103 @@ export default function MusicPage() {
   return (
     <>
       <div className="flex-1 bg-muted/20">
-        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 lg:px-6">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,1fr)] xl:items-start">
-            <section className="space-y-6">
-              <div className="overflow-hidden rounded-[28px]">
-                <div className="flex flex-wrap items-center justify-end gap-2 px-1 pb-3">
-                      <Badge variant={joined ? "default" : "outline"}>{joined ? "已加入" : "未加入"}</Badge>
-                      <Badge variant="outline">{activeUsers.length} 人</Badge>
-                      <Badge variant="outline">{mySongs.length} 首</Badge>
-                      {currentSong ? <Badge variant="secondary">{isPlaying ? "播放中" : "暂停中"}</Badge> : null}
-                    </div>
-                <div>
-                  <MainPlayer
-                    currentSong={joined ? currentSong : null}
-                    isPlaying={joined ? isPlaying : false}
-                    isCurrentUserSong={currentUserSong?.userId === user?.id}
-                    serverPosition={serverPosition}
-                    onSkipVote={api.skipVote}
-                    onForceSkip={api.forceSkip}
-                    skipVotes={skipVotes.length}
-                    skipThreshold={skipThreshold}
-                    activeUsers={activeUsers}
-                    currentUserId={currentUserSong?.userId || null}
-                    songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
-                    upcomingSongs={upcomingSongs}
-                  />
-                </div>
-              </div>
-
-              <Card className="overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
-                <CardHeader className="border-b border-border/60 pb-4">
-                  <CardTitle className="text-lg">房间消息</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ChatPanel />
-                </CardContent>
-              </Card>
-            </section>
-
-            <aside id="music-library" className="min-h-0 xl:sticky xl:top-20 xl:self-start">
-              <Card className="flex h-full overflow-hidden rounded-[28px] border border-border/60 bg-background shadow-sm xl:h-[calc(100vh-7.5rem)]">
-                <CardHeader className="border-b border-border/60 pb-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <CardTitle className="text-xl">歌单</CardTitle>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={joined ? "default" : "outline"}>{joined ? "已参与轮播" : "仅编辑歌单"}</Badge>
-                      <Badge variant="outline">{currentUserSong?.userId === user?.id ? "轮到你" : "等待轮到"}</Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="min-h-0 flex-1 p-0">
-                  <RightPanels
-                    mySongs={mySongs}
-                    currentSong={currentSong}
-                    onReorder={api.reorder}
-                    onClear={api.clear}
-                    onRandomize={api.randomize}
-                    onDelete={api.deleteSong}
-                    onAddSong={api.addSong}
-                    onAddSongs={api.addSongs}
-                    biliLoggedIn={biliLoggedIn}
-                    biliUname={biliUname}
-                    onBiliLogin={() => setLoginOpen(true)}
-                    onPhoneLogin={() => setPhoneLoginOpen(true)}
-                    onBiliLogout={async () => {
-                      try {
-                        await fetch(apiUrl("/api/bilibili/login/logout"), { method: "POST" });
-                        setBiliLoggedIn(false);
-                        setBiliUname("");
-                        toast.success("已退出 B 站登录");
-                      } catch {
-                        toast.error("退出失败");
-                      }
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            </aside>
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={joined ? "default" : "outline"}>{joined ? "已加入" : "未加入"}</Badge>
+              <Badge variant="outline">{activeUsers.length} 人</Badge>
+              <Badge variant="outline">{mySongs.length} 首</Badge>
+              {currentSong ? <Badge variant="secondary">{isPlaying ? "播放中" : "暂停中"}</Badge> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {!joined ? (
+                <Button onClick={api.join} disabled={!user}>
+                  {user ? "加入音乐室" : "登录后加入"}
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={api.leave}>
+                  离开房间
+                </Button>
+              )}
+              <Button variant={chatOpen ? "secondary" : "outline"} onClick={() => setChatOpen((prev) => !prev)}>
+                {chatOpen ? "收起消息" : "房间消息"}
+              </Button>
+              <Button variant={libraryOpen ? "secondary" : "outline"} onClick={() => setLibraryOpen((prev) => !prev)}>
+                {libraryOpen ? "收起歌单" : "歌单"}
+              </Button>
+            </div>
           </div>
+
+          <MainPlayer
+            currentSong={joined ? currentSong : null}
+            isPlaying={joined ? isPlaying : false}
+            isCurrentUserSong={currentUserSong?.userId === user?.id}
+            serverPosition={serverPosition}
+            onSkipVote={api.skipVote}
+            onForceSkip={api.forceSkip}
+            skipVotes={skipVotes.length}
+            skipThreshold={skipThreshold}
+            activeUsers={activeUsers}
+            currentUserId={currentUserSong?.userId || null}
+            songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
+            upcomingSongs={upcomingSongs}
+          />
+        </div>
+
+        <div
+          className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${libraryOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={() => setLibraryOpen(false)}
+        />
+
+        <aside
+          className={`fixed right-0 top-14 z-50 h-[calc(100vh-3.5rem)] w-full max-w-[64rem] transition-transform duration-300 ${libraryOpen ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+        >
+          <div className="flex h-full flex-col border-l border-border/60 bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
+              <div className="text-lg font-semibold">歌单</div>
+              <Button variant="ghost" size="sm" onClick={() => setLibraryOpen(false)}>
+                关闭
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <RightPanels
+                mySongs={mySongs}
+                currentSong={currentSong}
+                onReorder={api.reorder}
+                onClear={api.clear}
+                onRandomize={api.randomize}
+                onDelete={api.deleteSong}
+                onAddSong={api.addSong}
+                onAddSongs={api.addSongs}
+                biliLoggedIn={biliLoggedIn}
+                biliUname={biliUname}
+                onBiliLogin={() => setLoginOpen(true)}
+                onPhoneLogin={() => setPhoneLoginOpen(true)}
+                onBiliLogout={async () => {
+                  try {
+                    await fetch(apiUrl("/api/bilibili/login/logout"), { method: "POST" });
+                    setBiliLoggedIn(false);
+                    setBiliUname("");
+                    toast.success("已退出 B 站登录");
+                  } catch {
+                    toast.error("退出失败");
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </aside>
+
+        <div
+          className={`fixed bottom-4 left-4 z-40 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-2xl transition-all duration-300 ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0"}`}
+        >
+          <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
+            <div className="text-lg font-semibold">房间消息</div>
+            <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)}>
+              关闭
+            </Button>
+          </div>
+          <ChatPanel />
         </div>
       </div>
 

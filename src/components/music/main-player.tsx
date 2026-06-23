@@ -443,7 +443,7 @@ export function MainPlayer({
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div className="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.2),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_24%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         {currentSong ? (
           <div className="grid gap-5 p-5 lg:grid-cols-[14rem_minmax(0,1fr)]">

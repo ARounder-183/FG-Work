@@ -165,7 +165,7 @@ export function ChatPanel() {
   };
 
   return (
-    <div className="grid h-[26rem] min-h-0 grid-rows-[auto_1fr_auto] bg-background lg:h-[28rem]">
+    <div className="grid h-[28rem] min-h-0 grid-rows-[auto_1fr_auto] bg-background">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-4 sm:px-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">
