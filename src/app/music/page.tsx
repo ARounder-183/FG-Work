@@ -4,9 +4,8 @@ import { apiUrl } from "@/lib/url";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MainPlayer } from "@/components/music/main-player";
 import { RightPanels } from "@/components/music/right-panels";
@@ -293,18 +292,22 @@ export default function MusicPage() {
   };
 
   const nextSongs = queuePreview(fullQueue, currentSong);
-  const totalDuration = mySongs.reduce((sum, item) => {
-    const song = parseSong(item.songData);
-    return sum + (song?.duration || 0);
-  }, 0);
+  const upcomingSongs = nextSongs.slice(0, 5).map(({ item, song, isCurrent }) => ({
+    id: item.id,
+    name: song?.name || "解析失败的歌曲",
+    artists: song?.artists || "未知作者",
+    userName: item.user.username,
+    duration: song ? formatDuration(song.duration) : "--:--",
+    isCurrent,
+  }));
 
   if (loading) {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 lg:px-6">
-        <Skeleton className="h-28 w-full rounded-[28px]" />
-        <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-          <Skeleton className="h-[32rem] w-full rounded-[32px]" />
-          <Skeleton className="h-[32rem] w-full rounded-[32px]" />
+        <Skeleton className="h-[28rem] w-full rounded-[28px]" />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,1fr)]">
+          <Skeleton className="h-[24rem] w-full rounded-[24px]" />
+          <Skeleton className="h-[32rem] w-full rounded-[24px]" />
         </div>
       </div>
     );
@@ -313,92 +316,17 @@ export default function MusicPage() {
   return (
     <>
       <div className="flex-1 bg-muted/20">
-        
         <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 lg:px-6">
-          <section className="overflow-hidden rounded-[28px] border border-border/60 bg-background shadow-sm">
-            <div className="grid gap-6 px-5 py-5 lg:grid-cols-[1.15fr_0.85fr] lg:px-6 lg:py-6">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={joined ? "default" : "outline"}>{joined ? "已加入房间" : "房间外旁听"}</Badge>
-                  <Badge variant="secondary">{activeUsers.length} 人在线</Badge>
-                  <Badge variant="outline">{mySongs.length} 首待播</Badge>
-                  {currentSong && <Badge variant="outline">播放中</Badge>}
-                </div>
-
-                <div className="space-y-2">
-                  <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">听歌房</h1>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">播放、聊天和加歌都在这一页完成。</p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {!joined ? (
-                    <Button size="lg" onClick={api.join} disabled={!user}>
-                      {user ? "加入音乐室" : "登录后加入"}
-                    </Button>
-                  ) : (
-                    <Button size="lg" variant="outline" onClick={api.leave}>
-                      离开房间
-                    </Button>
-                  )}
-                  <Button size="lg" variant="ghost" onClick={() => document.getElementById("music-library")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-                    去加歌
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                <Card className="border-border/60 bg-muted/20 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">房间节奏</CardTitle>
-                    <CardDescription>当前轮播状态</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-1">
-                    <div className="text-2xl font-semibold tabular-nums">{activeUsers.length}</div>
-                    <p className="text-xs text-muted-foreground">在线用户数量</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border/60 bg-muted/20 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">我的歌单</CardTitle>
-                    <CardDescription>排队长度与时长</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-1">
-                    <div className="text-2xl font-semibold tabular-nums">{mySongs.length}</div>
-                    <p className="text-xs text-muted-foreground">总计 {formatDuration(totalDuration)}</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border/60 bg-muted/20 shadow-none sm:col-span-3 lg:col-span-1 xl:col-span-1">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">B站能力</CardTitle>
-                    <CardDescription>收藏夹与视频搜索</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "未登录 Bilibili"}</p>
-                    <p className="text-xs text-muted-foreground">未登录时只能搜网易云，登录后才能把收藏夹作为稳定歌源。</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </section>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.9fr)] xl:items-start">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,1fr)] xl:items-start">
             <section className="space-y-6">
-              <Card className="overflow-hidden rounded-[28px] border border-border/60 bg-background shadow-sm">
-                <CardHeader className="border-b border-border/60 pb-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-xl">主舞台</CardTitle>
-                      <CardDescription>当前播放、投票切歌、房间成员状态</CardDescription>
+              <div className="overflow-hidden rounded-[28px]">
+                <div className="flex flex-wrap items-center justify-end gap-2 px-1 pb-3">
+                      <Badge variant={joined ? "default" : "outline"}>{joined ? "已加入" : "未加入"}</Badge>
+                      <Badge variant="outline">{activeUsers.length} 人</Badge>
+                      <Badge variant="outline">{mySongs.length} 首</Badge>
+                      {currentSong ? <Badge variant="secondary">{isPlaying ? "播放中" : "暂停中"}</Badge> : null}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className={`h-2.5 w-2.5 rounded-full ${isPlaying ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                      {currentSong ? (isPlaying ? "正在同步播放" : "已暂停，等待继续") : "还没有开始播放"}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-4 py-5 sm:px-6">
+                <div>
                   <MainPlayer
                     currentSong={joined ? currentSong : null}
                     isPlaying={joined ? isPlaying : false}
@@ -411,67 +339,30 @@ export default function MusicPage() {
                     activeUsers={activeUsers}
                     currentUserId={currentUserSong?.userId || null}
                     songSubmittedBy={currentUserSong ? { username: currentUserSong.user.username, avatar: currentUserSong.user.avatar } : undefined}
+                    upcomingSongs={upcomingSongs}
                   />
+                </div>
+              </div>
+
+              <Card className="overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
+                <CardHeader className="border-b border-border/60 pb-4">
+                  <CardTitle className="text-lg">房间消息</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ChatPanel />
                 </CardContent>
               </Card>
-
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-                <Card className="overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
-                  <CardHeader className="border-b border-border/60 pb-4">
-                    <CardTitle className="text-lg">房间聊天</CardTitle>
-                    <CardDescription>实时消息和 TTS 播报合并在房间主视野里</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ChatPanel />
-                  </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
-                  <CardHeader className="border-b border-border/60 pb-4">
-                    <CardTitle className="text-lg">即将轮到</CardTitle>
-                    <CardDescription>每个用户的下一首，方便理解轮转顺序</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="max-h-[24rem] overflow-y-auto">
-                      {nextSongs.length === 0 ? (
-                        <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-                          队列还是空的，先从右侧把歌单堆起来。
-                        </div>
-                      ) : (
-                        nextSongs.map(({ item, song, isCurrent }, index) => (
-                          <div key={item.id} className={`flex items-center gap-3 px-5 py-3 ${index !== 0 ? "border-t border-border/50" : ""} ${isCurrent ? "bg-primary/8" : ""}`}>
-                            <div className="w-7 text-center font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div>
-                            <div className="min-w-0 flex-1">
-                              <div className={`truncate text-sm font-medium ${isCurrent ? "text-primary" : "text-foreground"}`}>
-                                {song?.name || "解析失败的歌曲"}
-                              </div>
-                              <div className="truncate text-xs text-muted-foreground">{song?.artists || "未知作者"}</div>
-                            </div>
-                            <div className="text-right text-xs">
-                              <div className="text-xs font-medium text-foreground">{item.user.username}</div>
-                              <div className="text-[11px] text-muted-foreground">{song ? formatDuration(song.duration) : "--:--"}</div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </section>
 
             <aside id="music-library" className="min-h-0 xl:sticky xl:top-20 xl:self-start">
               <Card className="flex h-full overflow-hidden rounded-[28px] border border-border/60 bg-background shadow-sm xl:h-[calc(100vh-7.5rem)]">
                 <CardHeader className="border-b border-border/60 pb-4">
-                  <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <CardTitle className="text-xl">歌单</CardTitle>
-                    <CardDescription>搜索、导入和整理都放在这里。</CardDescription>
-                  </div>
-                  <Separator className="mt-2" />
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>当前模式：</span>
-                    <Badge variant={joined ? "default" : "outline"}>{joined ? "已参与轮播" : "仅编辑歌单"}</Badge>
-                    <Badge variant="outline">{currentUserSong?.userId === user?.id ? "轮到你" : "等待轮到"}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={joined ? "default" : "outline"}>{joined ? "已参与轮播" : "仅编辑歌单"}</Badge>
+                      <Badge variant="outline">{currentUserSong?.userId === user?.id ? "轮到你" : "等待轮到"}</Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="min-h-0 flex-1 p-0">

@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
 interface Song {
   id: number | string;
@@ -25,6 +24,15 @@ interface ActiveUser {
   avatar: string | null;
 }
 
+interface UpcomingSong {
+  id: string;
+  name: string;
+  artists: string;
+  userName: string;
+  duration: string;
+  isCurrent: boolean;
+}
+
 interface Props {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -37,6 +45,7 @@ interface Props {
   activeUsers: ActiveUser[];
   currentUserId: string | null;
   songSubmittedBy?: { username: string; avatar: string | null };
+  upcomingSongs?: UpcomingSong[];
 }
 
 interface MusicPlayerRuntime {
@@ -138,6 +147,7 @@ export function MainPlayer({
   activeUsers,
   currentUserId,
   songSubmittedBy,
+  upcomingSongs = [],
 }: Props) {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(() => {
@@ -433,177 +443,153 @@ export function MainPlayer({
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_18rem]">
-      <Card className="overflow-hidden rounded-[24px] border border-slate-800 bg-slate-950 text-white shadow-sm">
-        <CardContent className="p-0">
-          {currentSong ? (
-            <div className="grid gap-0 lg:grid-cols-[16rem_minmax(0,1fr)]">
-              <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
-                
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-white text-slate-950 hover:bg-white">{isPlaying ? "正在同步播放" : "暂停中"}</Badge>
-                    <Badge variant="outline" className="border-white/16 bg-white/6 text-white/80">
-                      {sourceLabel}
-                    </Badge>
-                  </div>
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.2),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_24%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        {currentSong ? (
+          <div className="grid gap-5 p-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-white text-slate-950 hover:bg-white">{isPlaying ? "正在同步播放" : "暂停中"}</Badge>
+                <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">
+                  {sourceLabel}
+                </Badge>
+              </div>
 
-                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-                    <div className="aspect-square">
-                      {coverUrl ? (
-                        <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-6xl">🎵</div>
-                      )}
-                    </div>
-                    
-                    <div className="border-t border-white/10 px-4 py-3">
-                      <p className="text-xs text-white/60">当前轮次</p>
-                      <p className="mt-2 text-sm font-medium text-white">{songSubmittedBy?.username || "房间轮播"}</p>
-                      <p className="text-xs text-white/58">当前正在占据播放位</p>
-                    </div>
-                  </div>
+              <div className="overflow-hidden rounded-[20px] border border-white/10 bg-white/5">
+                <div className="aspect-square">
+                  {coverUrl ? (
+                    <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-5xl">🎵</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="min-w-0 space-y-5">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">{activeUsers.length} 人在线</Badge>
+                  {songSubmittedBy ? (
+                    <Badge variant="outline" className="border-white/20 bg-white/5 text-white/80">
+                      点歌人 {songSubmittedBy.username}
+                    </Badge>
+                  ) : null}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">{currentSong.name}</h2>
+                  <p className="mt-2 truncate text-base text-white/80">{currentSong.artists}</p>
+                  <p className="mt-1 truncate text-sm text-white/55">{currentSong.album}</p>
                 </div>
               </div>
 
-              <div className="flex min-h-full flex-col justify-between p-5 sm:p-5">
-                <div className="space-y-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <p className="text-xs text-white/60">正在播放</p>
-                      <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{currentSong.name}</h2>
-                      <p className="text-base text-white/76">{currentSong.artists}</p>
-                      <p className="text-sm text-white/45">{currentSong.album}</p>
-                    </div>
+              <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between text-xs text-white/60">
+                  <span>播放进度</span>
+                  <span className="font-mono tabular-nums">{fmt(progressPosition)} / {fmtTotal(duration)}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-amber-400 transition-all duration-700" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-950">
-                        投票切歌 {skipVotes}/{skipThreshold}
-                      </Button>
-                      {isCurrentUserSong ? (
-                        <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/14 bg-transparent text-white">
-                          直接跳过
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                <div className="rounded-[18px] border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs text-white/60">当前歌词</p>
+                  <p className="mt-3 min-h-[4.5rem] break-words text-base leading-7 text-white/88">
+                    {currentLine || "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
+                  </p>
+                </div>
 
-                  <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between text-xs text-white/56">
-                      <span>播放进度</span>
-                      <span className="font-mono tabular-nums">{fmt(progressPosition)} / {fmtTotal(duration)}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-400 transition-all duration-700"
-                        style={{ width: `${progress}%` }}
+                <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
+                    <div className="text-xs text-white/60">音量</div>
+                    <div className="mt-2 flex items-center gap-3">
+                      <span className="text-xs text-white/55">静</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={volume}
+                        onChange={(event) => {
+                          const nextVolume = Number(event.target.value);
+                          setVolume(nextVolume);
+                          localStorage.setItem("music-volume", String(nextVolume));
+                        }}
+                        className="h-1.5 flex-1 cursor-pointer accent-amber-300"
                       />
+                      <span className="text-xs text-white/55">强</span>
                     </div>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-                    <div className="rounded-[18px] border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs text-white/60">当前歌词</p>
-                      <p className="mt-3 min-h-[4.5rem] text-base leading-7 text-white/88">
-                        {currentLine || "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs text-white/60">房间控制</p>
-                      <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
-                        <div className="text-xs text-white/60">音量</div>
-                        <div className="mt-2 flex items-center gap-3">
-                          <span className="text-xs text-white/55">静</span>
-                          <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            value={volume}
-                            onChange={(event) => {
-                              const nextVolume = Number(event.target.value);
-                              setVolume(nextVolume);
-                              localStorage.setItem("music-volume", String(nextVolume));
-                            }}
-                            className="h-1.5 flex-1 cursor-pointer accent-amber-300"
-                          />
-                          <span className="text-xs text-white/55">强</span>
-                        </div>
-                      </div>
-
-                      {songSubmittedBy ? (
-                        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-3">
-                          <Avatar className="h-11 w-11 border border-white/10">
-                            <AvatarImage src={songSubmittedBy.avatar || ""} />
-                            <AvatarFallback>{songSubmittedBy.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">{songSubmittedBy.username}</p>
-                            <p className="truncate text-xs text-white/50">当前轮播拥有者</p>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" size="lg" onClick={onSkipVote} className="bg-white text-slate-950">
+                      投票切歌 {skipVotes}/{skipThreshold}
+                    </Button>
+                    {isCurrentUserSong ? (
+                      <Button variant="ghost" size="lg" onClick={onForceSkip} className="border border-white/14 bg-transparent text-white">
+                        直接跳过
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="flex min-h-[22rem] flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-4xl">🎧</div>
+            <p className="mt-5 text-xl font-semibold text-white">房间里还没有歌曲。</p>
+            <p className="mt-3 max-w-md text-sm leading-6 text-white/60">先去右侧加歌，播放完会自动移到队尾。</p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-[22px] border border-border/60 bg-background/92 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          {activeUsers.length > 0 ? (
+            activeUsers.map((user) => {
+              const isCurrent = user.id === currentUserId;
+              return (
+                <div
+                  key={user.id}
+                  className={`group relative flex items-center gap-2 rounded-full border px-2.5 py-2 ${
+                    isCurrent ? "border-primary/35 bg-primary/8 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]" : "border-border/60 bg-muted/20"
+                  }`}
+                >
+                  <Avatar className={`h-10 w-10 ${isCurrent ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}>
+                    <AvatarImage src={user.avatar || ""} />
+                    <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {isCurrent ? <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary shadow-[0_0_16px_rgba(59,130,246,0.7)]" /> : null}
+                  <span className="max-w-[6rem] truncate text-sm font-medium text-foreground">{user.username}</span>
+                </div>
+              );
+            })
           ) : (
-            <div className="flex min-h-[24rem] flex-col items-center justify-center px-6 py-12 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-4xl">
-                🎧
-              </div>
-              <p className="mt-5 text-xl font-semibold text-white">房间里还没有歌曲。</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-white/60">先去右侧加歌，播放完会自动移到队尾。</p>
+            <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-sm text-muted-foreground">
+              还没有人在房间里，先加入再说。
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card className="rounded-[24px] border border-border/60 bg-background shadow-sm">
-        <CardContent className="space-y-4 p-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">房间成员</p>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold">当前在场的人</h3>
-              <Badge variant="outline">{activeUsers.length} 位</Badge>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {activeUsers.length > 0 ? (
-              activeUsers.map((user) => {
-                const isCurrent = user.id === currentUserId;
-                return (
-                  <div
-                    key={user.id}
-                    className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition ${
-                      isCurrent ? "border-primary/35 bg-primary/8" : "border-border/60 bg-muted/20"
-                    }`}
-                  >
-                    <div className="relative">
-                      <Avatar className={`h-11 w-11 ${isCurrent ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}>
-                        <AvatarImage src={user.avatar || ""} />
-                        <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      {isCurrent ? <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-background bg-primary" /> : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-foreground">{user.username}</div>
-                      <div className="text-xs text-muted-foreground">{isCurrent ? "当前轮次" : "等待中"}</div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-[22px] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                还没有人在房间里，先加入再说。
+        {upcomingSongs.length > 0 ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {upcomingSongs.map((song, index) => (
+              <div key={song.id} className={`rounded-2xl border px-3 py-3 ${song.isCurrent ? "border-primary/35 bg-primary/8" : "border-border/60 bg-muted/20"}`}>
+                <div className="text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div>
+                <div className="mt-2 truncate text-sm font-medium">{song.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{song.artists}</div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">{song.userName}</span>
+                  <span>{song.duration}</span>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        ) : null}
+      </div>
     </div>
   );
 }

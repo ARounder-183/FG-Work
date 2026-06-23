@@ -172,7 +172,7 @@ export function ChatPanel() {
             <Badge variant="outline">{messages.length} 条消息</Badge>
             <Badge variant="secondary">TTS</Badge>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">消息会持续刷新，新消息按顺序播报。</p>
+          
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>音量</span>

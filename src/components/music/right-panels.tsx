@@ -231,14 +231,11 @@ export function RightPanels({
   }, 0);
 
   return (
-    <div className="grid h-full min-h-0 gap-4 bg-muted/20 p-4 sm:p-5 xl:grid-rows-[minmax(0,1fr)_minmax(0,0.9fr)]">
+    <div className="grid h-full min-h-0 gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
         <div className="space-y-4 border-b border-border/60 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold">找歌</h3>
-              <p className="mt-1 text-xs text-muted-foreground">搜到以后可以单首加，也可以整批加入。</p>
-            </div>
+            <h3 className="text-lg font-semibold">找歌</h3>
             <div className="inline-flex rounded-full border border-border bg-muted/50 p-1">
               <button
                 onClick={() => handleSourceChange("ncm")}
@@ -270,10 +267,7 @@ export function RightPanels({
 
           {source === "bilibili" ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-3">
-              <div>
-                <div className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "B 站未登录"}</div>
-                <div className="text-xs text-muted-foreground">登录后可以直接导入收藏夹。</div>
-              </div>
+              <div className="text-sm font-medium">{biliLoggedIn ? biliUname || "已登录 Bilibili" : "B 站未登录"}</div>
               <div className="flex gap-2">
                 {biliLoggedIn ? (
                   <Button variant="outline" size="sm" onClick={onBiliLogout}>退出</Button>
@@ -359,7 +353,6 @@ export function RightPanels({
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col justify-center rounded-2xl border border-border/60 bg-muted/20 px-4 py-8 text-center">
                     <p className="text-sm font-medium">没有读取到收藏夹</p>
-                    <p className="mt-1 text-xs text-muted-foreground">可以重新试一次。</p>
                     <Button variant="outline" size="sm" className="mx-auto mt-4" onClick={() => void fetchFavorites()}>重新加载</Button>
                   </div>
                 )
@@ -380,10 +373,7 @@ export function RightPanels({
       <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-sm">
         <div className="space-y-4 border-b border-border/60 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold">我的歌单</h3>
-              <p className="mt-1 text-xs text-muted-foreground">播放完会自动移到队尾。</p>
-            </div>
+            <h3 className="text-lg font-semibold">我的歌单</h3>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{mySongs.length} 首</Badge>
               <Badge variant="secondary">总时长 {fmt(totalDuration)}</Badge>
@@ -395,7 +385,6 @@ export function RightPanels({
             <Button variant="ghost" size="sm" onClick={onClear} disabled={mySongs.length === 0}>清空歌单</Button>
           </div>
           <Separator />
-          <p className="text-xs text-muted-foreground">拖拽调整顺序，当前正在播放的歌曲会高亮显示。</p>
         </div>
 
         <div className="min-h-0 flex-1 px-4 py-4 sm:px-5">
@@ -538,7 +527,7 @@ function PanelList({
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-sm">{item.icon}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{item.title}</div>
-                <div className="text-xs text-muted-foreground">{item.meta}</div>
+                <div className="truncate text-xs text-muted-foreground">{item.meta}</div>
               </div>
             </button>
           ))
