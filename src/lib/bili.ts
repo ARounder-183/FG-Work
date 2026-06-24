@@ -286,8 +286,11 @@ export async function getAudioUrl(
       realCid = info.cid;
     }
 
+    // Use the legacy non-WBI endpoint: as of 2026-06 the WBI variant returns
+    // HTTP 412 (risk control HTML page) for guest requests, while this one
+    // still returns dash.audio with only buvid3.
     const data = await biliGet(
-      "/x/player/wbi/playurl",
+      "/x/player/playurl",
       {
         bvid,
         cid: String(realCid),
@@ -296,7 +299,6 @@ export async function getAudioUrl(
         fourk: "1",
       },
       {
-        signed: true,
         cookie: cookie || undefined,
         referer: `https://www.bilibili.com/video/${bvid}/`,
       },
@@ -310,7 +312,8 @@ export async function getAudioUrl(
       (a.bandwidth ?? 0) > (b.bandwidth ?? 0) ? a : b,
     );
     return best.baseUrl ?? best.base_url ?? null;
-  } catch {
+  } catch (e) {
+    console.error("[BILI] getAudioUrl failed:", bvid, e);
     return null;
   }
 }
