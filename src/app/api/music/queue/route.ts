@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { getVideoInfo } from "@/lib/bili";
+import { getSongDetail as getNcmSongDetail } from "@/lib/ncm";
 
 export async function GET() {
   try {
@@ -46,6 +47,19 @@ export async function POST(req: NextRequest) {
           }
         } catch {
           // Silent — cid will be resolved later at play time
+        }
+      }
+
+      // Pre-resolve high-res cover for NCM songs so the player has a stable
+      // picUrl across state polls (search picUrl can be a transient/low-res
+      // variant that 404s after a while).
+      const isNcm = !songObj.source || songObj.source === "ncm";
+      if (isNcm && songObj.id && !songObj.picUrl) {
+        try {
+          const detail = await getNcmSongDetail(songObj.id as string | number);
+          if (detail?.picUrl) songObj.picUrl = detail.picUrl;
+        } catch {
+          // Silent — fallback to runtime detail fetch on the client
         }
       }
 

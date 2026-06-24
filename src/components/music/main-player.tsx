@@ -276,12 +276,17 @@ export function MainPlayer({
       ? `bili:${currentSong.bvid ?? currentSong.id}`
       : `ncm:${currentSong.id}`;
 
-    setCoverUrl(currentSong.picUrl || null);
     setPosition(audio.currentTime);
 
     if (runtime.lastKey === songKey) {
+      // Same song — don't reset cover, otherwise state polls (which produce a
+      // new currentSong reference even when content is unchanged) would replace
+      // the high-res cover fetched from /detail with the search-time picUrl,
+      // and could even swap a working URL for an empty one.
       return;
     }
+
+    setCoverUrl(currentSong.picUrl || null);
 
     runtime.playbackToken += 1;
     const playbackToken = runtime.playbackToken;
@@ -436,8 +441,11 @@ export function MainPlayer({
   }, [serverPosition]);
 
   const duration = currentSong?.duration || 0;
-  const progressPosition = serverPosition || position;
-  const progress = duration > 0 ? Math.min((progressPosition / duration) * 100, 100) : 0;
+  // Drive the progress bar from the local `position` (updated via the audio
+  // element's timeupdate event ~4x/s). serverPosition is only used as a drift
+  // corrector — it moves audio.currentTime, which then flows back into
+  // `position`, instead of the bar jumping straight to it every poll.
+  const progress = duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
   const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
@@ -445,11 +453,23 @@ export function MainPlayer({
       {coverUrl ? (
         <div
           aria-hidden
-          className="fg-music-aurora-1 absolute inset-0 scale-110 bg-cover bg-center opacity-55 blur-3xl"
-          style={{ backgroundImage: `url(${proxyImage(coverUrl)})` }}
+          className="absolute inset-0 bg-cover bg-center opacity-60 blur-3xl"
+          style={{
+            backgroundImage: `url(${proxyImage(coverUrl)})`,
+            animation: "fg-music-aurora 24s ease-in-out infinite",
+            transformOrigin: "center",
+            willChange: "transform",
+          }}
         />
       ) : null}
-      <div className="fg-music-aurora-2 absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.45),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(244,114,182,0.55),transparent_42%),radial-gradient(circle_at_30%_82%,rgba(56,189,248,0.45),transparent_44%),radial-gradient(circle_at_78%_78%,rgba(251,191,36,0.40),transparent_42%)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_30%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.14),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.10),transparent_30%)]" />
+      <div
+        className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.45),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(244,114,182,0.55),transparent_42%),radial-gradient(circle_at_30%_82%,rgba(56,189,248,0.45),transparent_44%),radial-gradient(circle_at_78%_78%,rgba(251,191,36,0.40),transparent_42%)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_30%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.14),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.10),transparent_30%)]"
+        style={{
+          animation: "fg-music-aurora-alt 32s ease-in-out infinite",
+          transformOrigin: "center",
+          willChange: "transform, opacity",
+        }}
+      />
       <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/25 to-black/45 dark:from-slate-950/55 dark:via-slate-950/65 dark:to-slate-950/90" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/15 to-transparent dark:from-white/6" />
 
@@ -539,7 +559,7 @@ export function MainPlayer({
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3 text-sm text-white/62">
-                    <span>{fmt(progressPosition)}</span>
+                    <span>{fmt(position)}</span>
                     <span>{fmtTotal(duration)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">

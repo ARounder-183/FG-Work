@@ -141,3 +141,16 @@ export async function getLyric(id: string | number): Promise<string | null> {
   const data = await ncm<{ lrc?: { lyric?: string } }>("/lyric", { id: String(id) });
   return data?.lrc?.lyric || null;
 }
+
+export async function getSongDetail(
+  id: string | number,
+): Promise<{ picUrl?: string; duration?: number } | null> {
+  const data = await ncm<{ songs?: NcmSongRaw[] }>("/song/detail", { ids: String(id) });
+  const s = data?.songs?.[0];
+  if (!s) return null;
+  const dtMs = s.dt || s.duration || 0;
+  return {
+    picUrl: s.al?.picUrl,
+    duration: dtMs > 0 ? Math.floor(dtMs / 1000) : undefined,
+  };
+}
