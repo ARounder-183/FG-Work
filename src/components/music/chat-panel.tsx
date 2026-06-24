@@ -180,7 +180,7 @@ export function ChatPanel() {
             type="range"
             min={0}
             max={1}
-            step={0.05}
+            step={0.02}
             value={ttsVolume}
             onChange={(event) => {
               const next = Number(event.target.value);

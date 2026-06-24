@@ -568,7 +568,7 @@ export function MainPlayer({
                       type="range"
                       min={0}
                       max={1}
-                      step={0.05}
+                      step={0.02}
                       value={volume}
                       onChange={(event) => {
                         const nextVolume = Number(event.target.value);
