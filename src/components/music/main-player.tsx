@@ -453,23 +453,12 @@ export function MainPlayer({
       {coverUrl ? (
         <div
           aria-hidden
-          className="absolute inset-0 bg-cover bg-center opacity-60 blur-3xl"
+          className="absolute -inset-[8%] bg-cover bg-center opacity-60 blur-3xl"
           style={{
             backgroundImage: `url(${proxyImage(coverUrl)})`,
-            animation: "fg-music-aurora 24s ease-in-out infinite",
-            transformOrigin: "center",
-            willChange: "transform",
           }}
         />
       ) : null}
-      <div
-        className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.45),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(244,114,182,0.55),transparent_42%),radial-gradient(circle_at_30%_82%,rgba(56,189,248,0.45),transparent_44%),radial-gradient(circle_at_78%_78%,rgba(251,191,36,0.40),transparent_42%)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_30%),radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.14),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(244,114,182,0.10),transparent_30%)]"
-        style={{
-          animation: "fg-music-aurora-alt 32s ease-in-out infinite",
-          transformOrigin: "center",
-          willChange: "transform, opacity",
-        }}
-      />
       <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/25 to-black/45 dark:from-slate-950/55 dark:via-slate-950/65 dark:to-slate-950/90" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/15 to-transparent dark:from-white/6" />
 

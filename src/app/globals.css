@@ -132,36 +132,3 @@
 }
 
 /* Theme toggle circular reveal — driven by injected <style> in navbar.tsx */
-
-@keyframes fg-music-aurora {
-  0%   { transform: translate3d(-6%, -4%, 0) scale(1.18) rotate(0deg); }
-  25%  { transform: translate3d(5%, -3%, 0)  scale(1.30) rotate(2deg); }
-  50%  { transform: translate3d(6%, 6%, 0)   scale(1.20) rotate(0deg); }
-  75%  { transform: translate3d(-5%, 5%, 0)  scale(1.32) rotate(-2deg); }
-  100% { transform: translate3d(-6%, -4%, 0) scale(1.18) rotate(0deg); }
-}
-
-@keyframes fg-music-aurora-alt {
-  0%   { transform: translate3d(0, 0, 0) scale(1.05) rotate(0deg); opacity: 1; }
-  33%  { transform: translate3d(-8%, 6%, 0) scale(1.18) rotate(-3deg); opacity: 0.78; }
-  66%  { transform: translate3d(9%, -7%, 0) scale(0.94) rotate(3deg); opacity: 1; }
-  100% { transform: translate3d(0, 0, 0) scale(1.05) rotate(0deg); opacity: 1; }
-}
-
-.fg-music-aurora-1 {
-  animation: fg-music-aurora 24s ease-in-out infinite;
-  transform-origin: center;
-  will-change: transform;
-}
-.fg-music-aurora-2 {
-  animation: fg-music-aurora-alt 32s ease-in-out infinite;
-  transform-origin: center;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fg-music-aurora-1,
-  .fg-music-aurora-2 {
-    animation: none;
-  }
-}
