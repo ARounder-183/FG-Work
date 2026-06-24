@@ -46,6 +46,7 @@ interface Props {
 interface MusicPlayerRuntime {
   audio: HTMLAudioElement;
   lastKey: string | null;
+  coverUrl: string | null;
   playbackToken: number;
   sourceController: AbortController | null;
   detailController: AbortController | null;
@@ -77,6 +78,7 @@ function createRuntime(): MusicPlayerRuntime {
   return {
     audio,
     lastKey: null,
+    coverUrl: null,
     playbackToken: 0,
     sourceController: null,
     detailController: null,
@@ -162,7 +164,10 @@ export function MainPlayer({
 
     return 0.7;
   });
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrlState] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return getRuntime().coverUrl;
+  });
   const [lyric, setLyric] = useState<string | null>(null);
   const [currentLine, setCurrentLine] = useState("");
   const currentSongRef = useRef(currentSong);
@@ -179,6 +184,12 @@ export function MainPlayer({
   const clearRetryTimers = () => {
     retryTimers.current.forEach((timer) => window.clearTimeout(timer));
     retryTimers.current = [];
+  };
+
+  const setCoverUrl = (url: string | null) => {
+    const runtime = getRuntime();
+    runtime.coverUrl = url;
+    setCoverUrlState(url);
   };
 
   useEffect(() => {
@@ -601,7 +612,7 @@ export function MainPlayer({
 
         {currentSong ? (
           <>
-            <div className="grid min-h-0 flex-1 -translate-y-12 gap-8 pt-8 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-center">
+            <div className="grid min-h-0 flex-1 -translate-y-16 gap-8 pt-8 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-center">
               <div className="mx-auto flex w-full max-w-[19rem] flex-col gap-5">
                 <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/6 shadow-[0_28px_80px_rgba(0,0,0,0.36)] backdrop-blur-sm">
                   <div className="aspect-square">
@@ -715,7 +726,7 @@ export function MainPlayer({
             </div>
           </>
         ) : (
-          <div className="flex flex-1 -translate-y-24 flex-col items-center justify-center px-6 py-16 text-center">
+          <div className="flex flex-1 -translate-y-28 flex-col items-center justify-center px-6 py-16 text-center">
             <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/6 text-5xl shadow-[0_20px_50px_rgba(0,0,0,0.28)]">
               ♪
             </div>
