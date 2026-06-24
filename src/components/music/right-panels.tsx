@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { HoverTooltip } from "@/components/ui/hover-tooltip";
 import { toast } from "sonner";
 
 interface Song {
@@ -435,8 +436,8 @@ export function RightPanels({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className={`truncate text-[13px] font-medium leading-tight ${isCurrent ? "text-primary" : "text-foreground"}`}>{song?.name || "无效歌曲"}</div>
-                      <div className="truncate text-[11px] leading-tight text-muted-foreground">{song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists || "未知作者"}</div>
+                      <HoverTooltip className={`truncate text-[13px] font-medium leading-tight ${isCurrent ? "text-primary" : "text-foreground"}`} label={song?.name}>{song?.name || "无效歌曲"}</HoverTooltip>
+                      <HoverTooltip className="truncate text-[11px] leading-tight text-muted-foreground" label={song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists}>{song?.source === "bilibili" ? `UP: ${song.artists}` : song?.artists || "未知作者"}</HoverTooltip>
                     </div>
                     <div className="text-right text-[11px] text-muted-foreground">
                       <div className="font-mono tabular-nums">{song ? fmt(song.duration) : "--:--"}</div>
@@ -493,8 +494,8 @@ function ResultSection({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{song.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{song.source === "bilibili" ? `UP: ${song.artists}` : song.artists}</div>
+                <HoverTooltip className="truncate text-sm font-medium" label={song.name}>{song.name}</HoverTooltip>
+                <HoverTooltip className="truncate text-xs text-muted-foreground" label={song.source === "bilibili" ? `UP: ${song.artists}` : song.artists}>{song.source === "bilibili" ? `UP: ${song.artists}` : song.artists}</HoverTooltip>
               </div>
               <div className="text-right text-xs text-muted-foreground">
                 <div className="font-mono tabular-nums">{fmt(song.duration)}</div>
@@ -535,8 +536,8 @@ function PanelList({
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-sm">{item.icon}</div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{item.title}</div>
-                <div className="truncate text-xs text-muted-foreground">{item.meta}</div>
+                <HoverTooltip className="truncate text-sm font-medium" label={item.title}>{item.title}</HoverTooltip>
+                <HoverTooltip className="truncate text-xs text-muted-foreground" label={item.meta}>{item.meta}</HoverTooltip>
               </div>
             </button>
           ))
