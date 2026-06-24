@@ -4,6 +4,7 @@ import { apiUrl, proxyImage } from "@/lib/url";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ParticleBackground } from "@/components/music/particle-background";
 
 interface Song {
   id: number | string;
@@ -115,7 +116,12 @@ function resetAudio(audio: HTMLAudioElement) {
   audio.currentTime = 0;
 }
 
-function loadAudioSource(audio: HTMLAudioElement, sourceUrl: string, position: number, shouldPlay: boolean) {
+function loadAudioSource(
+  audio: HTMLAudioElement,
+  sourceUrl: string,
+  position: number,
+  shouldPlay: boolean,
+) {
   audio.pause();
   audio.src = sourceUrl;
   audio.currentTime = position || 0;
@@ -166,6 +172,9 @@ export function MainPlayer({
   const errorRetries = useRef(0);
   const seekFailCount = useRef(0);
   const retryTimers = useRef<number[]>([]);
+  const sectionRef = useRef<HTMLElement>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const parallaxRef = useRef({ x: 0, y: 0 });
 
   const clearRetryTimers = () => {
     retryTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -199,7 +208,8 @@ export function MainPlayer({
       clearRetryTimers();
 
       const song = currentSongRef.current;
-      const playedEnough = song && song.duration > 0 && audio.currentTime >= song.duration * 0.9;
+      const playedEnough =
+        song && song.duration > 0 && audio.currentTime >= song.duration * 0.9;
       if (!playedEnough && endedRetries.current < 3) {
         endedRetries.current += 1;
         const expectedToken = runtime.playbackToken;
@@ -236,7 +246,12 @@ export function MainPlayer({
         errorRetries.current = 0;
         abortController(runtime.sourceController);
         runtime.sourceController = new AbortController();
-        void refetchBiliUrl(song, serverPositionRef.current, expectedToken, runtime.sourceController.signal);
+        void refetchBiliUrl(
+          song,
+          serverPositionRef.current,
+          expectedToken,
+          runtime.sourceController.signal,
+        );
       }
     };
 
@@ -272,9 +287,10 @@ export function MainPlayer({
       return;
     }
 
-    const songKey = currentSong.source === "bilibili"
-      ? `bili:${currentSong.bvid ?? currentSong.id}`
-      : `ncm:${currentSong.id}`;
+    const songKey =
+      currentSong.source === "bilibili"
+        ? `bili:${currentSong.bvid ?? currentSong.id}`
+        : `ncm:${currentSong.id}`;
 
     setPosition(audio.currentTime);
 
@@ -304,7 +320,12 @@ export function MainPlayer({
     runtime.sourceController = new AbortController();
 
     if (currentSong.source === "bilibili") {
-      void refetchBiliUrl(currentSong, serverPositionRef.current, playbackToken, runtime.sourceController.signal);
+      void refetchBiliUrl(
+        currentSong,
+        serverPositionRef.current,
+        playbackToken,
+        runtime.sourceController.signal,
+      );
       return;
     }
 
@@ -416,7 +437,10 @@ export function MainPlayer({
     const audio = getRuntime().audio;
     const update = () => {
       const current = audio.currentTime;
-      const line = lines.reduce((prev, entry) => (entry.time <= current ? entry : prev), lines[0]);
+      const line = lines.reduce(
+        (prev, entry) => (entry.time <= current ? entry : prev),
+        lines[0],
+      );
       setCurrentLine(line.text || "");
     };
 
@@ -445,22 +469,66 @@ export function MainPlayer({
   // element's timeupdate event ~4x/s). serverPosition is only used as a drift
   // corrector — it moves audio.currentTime, which then flows back into
   // `position`, instead of the bar jumping straight to it every poll.
-  const progress = duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
-  const sourceLabel = currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
+  const progress =
+    duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
+  const sourceLabel =
+    currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-400 text-white dark:bg-slate-950 dark:bg-none">
+    <section
+      ref={sectionRef}
+      onMouseEnter={(e) => {
+        lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      }}
+      onMouseMove={(e) => {
+        const section = sectionRef.current;
+        if (!section) return;
+
+        const previous = lastPointerRef.current;
+        lastPointerRef.current = { x: e.clientX, y: e.clientY };
+        if (!previous) return;
+
+        const rect = section.getBoundingClientRect();
+        const sensitivity = 0.005;
+        const maxX = 5;
+        const maxY = 5;
+        const clamp = (value: number, max: number) =>
+          Math.min(Math.max(value, -max), max);
+
+        const nextX = clamp(
+          parallaxRef.current.x -
+            ((e.clientX - previous.x) / rect.width) * 100 * sensitivity,
+          maxX,
+        );
+        const nextY = clamp(
+          parallaxRef.current.y -
+            ((e.clientY - previous.y) / rect.height) * 100 * sensitivity,
+          maxY,
+        );
+
+        parallaxRef.current = { x: nextX, y: nextY };
+        section.style.setProperty("--parallax-x", `${nextX}%`);
+        section.style.setProperty("--parallax-y", `${nextY}%`);
+      }}
+      onMouseLeave={() => {
+        lastPointerRef.current = null;
+      }}
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-400 text-white dark:bg-slate-950 dark:bg-none"
+    >
       {coverUrl ? (
-        <div
-          aria-hidden
-          className="absolute -inset-[8%] bg-cover bg-center opacity-60 blur-3xl"
-          style={{
-            backgroundImage: `url(${proxyImage(coverUrl)})`,
-          }}
-        />
+        <div aria-hidden className="music-cover-float absolute -inset-[10%]">
+          <div
+            className="music-cover-breathe absolute inset-0 bg-cover bg-center opacity-60 blur-xl"
+            style={{
+              backgroundImage: `url(${proxyImage(coverUrl)})`,
+            }}
+          />
+        </div>
       ) : null}
       <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/25 to-black/45 dark:from-slate-950/55 dark:via-slate-950/65 dark:to-slate-950/90" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/15 to-transparent dark:from-white/6" />
+
+      <ParticleBackground active={isPlaying} />
 
       <div className="relative flex min-h-0 flex-1 flex-col px-4 pb-5 pt-4 sm:px-6 sm:pb-6 lg:px-8 lg:pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -469,15 +537,26 @@ export function MainPlayer({
               activeUsers.map((user) => {
                 const isCurrent = user.id === currentUserId;
                 return (
-                  <div key={user.id} className="flex min-w-0 items-center gap-2.5">
+                  <div
+                    key={user.id}
+                    className="flex min-w-0 items-center gap-2.5"
+                  >
                     <div className="relative shrink-0">
-                      <Avatar className={`h-10 w-10 border border-white/12 ${isCurrent ? "ring-2 ring-amber-300/85 ring-offset-2 ring-offset-[#08111f]" : ""}`}>
+                      <Avatar
+                        className={`h-10 w-10 border border-white/12 ${isCurrent ? "ring-2 ring-amber-300/85 ring-offset-2 ring-offset-[#08111f]" : ""}`}
+                      >
                         <AvatarImage src={user.avatar || ""} />
-                        <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>
+                          {user.username.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
-                      {isCurrent ? <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.85)]" /> : null}
+                      {isCurrent ? (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.85)]" />
+                      ) : null}
                     </div>
-                    <span className={`max-w-[7rem] truncate text-sm ${isCurrent ? "font-medium text-white" : "text-white/72"}`}>
+                    <span
+                      className={`max-w-[7rem] truncate text-sm ${isCurrent ? "font-medium text-white" : "text-white/72"}`}
+                    >
                       {user.username}
                     </span>
                   </div>
@@ -501,11 +580,19 @@ export function MainPlayer({
               </span>
             ) : null}
             {joined ? (
-              <Button variant="outline" onClick={onLeaveRoom} className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white">
+              <Button
+                variant="outline"
+                onClick={onLeaveRoom}
+                className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white"
+              >
                 离开房间
               </Button>
             ) : (
-              <Button onClick={onJoinRoom} disabled={!canJoin} className="bg-white text-slate-950 hover:bg-white/90">
+              <Button
+                onClick={onJoinRoom}
+                disabled={!canJoin}
+                className="bg-white text-slate-950 hover:bg-white/90"
+              >
                 {canJoin ? "加入音乐室" : "登录后加入"}
               </Button>
             )}
@@ -519,16 +606,26 @@ export function MainPlayer({
                 <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/6 shadow-[0_28px_80px_rgba(0,0,0,0.36)] backdrop-blur-sm">
                   <div className="aspect-square">
                     {coverUrl ? (
-                      <img src={proxyImage(coverUrl)} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={proxyImage(coverUrl)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-white/6 text-6xl">♪</div>
+                      <div className="flex h-full items-center justify-center bg-white/6 text-6xl">
+                        ♪
+                      </div>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 text-xs text-white/58">
                   <span>{sourceLabel}</span>
-                  <span>{songSubmittedBy ? `点歌人 ${songSubmittedBy.username}` : ""}</span>
+                  <span>
+                    {songSubmittedBy
+                      ? `点歌人 ${songSubmittedBy.username}`
+                      : ""}
+                  </span>
                 </div>
               </div>
 
@@ -536,13 +633,23 @@ export function MainPlayer({
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-white/58">
                     {joined ? <span>已加入房间</span> : <span>旁听中</span>}
-                    {songSubmittedBy ? <span className="h-1 w-1 rounded-full bg-white/35" /> : null}
-                    {songSubmittedBy ? <span>{songSubmittedBy.username}</span> : null}
+                    {songSubmittedBy ? (
+                      <span className="h-1 w-1 rounded-full bg-white/35" />
+                    ) : null}
+                    {songSubmittedBy ? (
+                      <span>{songSubmittedBy.username}</span>
+                    ) : null}
                   </div>
                   <div>
-                    <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">{currentSong.name}</h1>
-                    <p className="mt-3 text-base text-white/78 sm:text-lg">{currentSong.artists}</p>
-                    <p className="mt-1 text-sm text-white/48">{currentSong.album}</p>
+                    <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                      {currentSong.name}
+                    </h1>
+                    <p className="mt-3 text-base text-white/78 sm:text-lg">
+                      {currentSong.artists}
+                    </p>
+                    <p className="mt-1 text-sm text-white/48">
+                      {currentSong.album}
+                    </p>
                   </div>
                 </div>
 
@@ -552,22 +659,35 @@ export function MainPlayer({
                     <span>{fmtTotal(duration)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-sky-300 transition-all duration-700" style={{ width: `${progress}%` }} />
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-sky-300 transition-all duration-700"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
                 </div>
 
                 <div className="rounded-[26px] border border-white/10 bg-black/18 px-5 py-5 backdrop-blur-sm">
                   <p className="text-sm leading-8 text-white/88 sm:text-lg sm:leading-9">
-                    {currentLine || "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
+                    {currentLine ||
+                      "当前歌曲没有可用歌词，或者歌词还没加载出来。"}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button size="lg" onClick={onSkipVote} className="bg-white text-slate-950 hover:bg-white/90">
+                  <Button
+                    size="lg"
+                    onClick={onSkipVote}
+                    className="bg-white text-slate-950 hover:bg-white/90"
+                  >
                     投票切歌 {skipVotes}/{skipThreshold}
                   </Button>
                   {isCurrentUserSong ? (
-                    <Button size="lg" variant="outline" onClick={onForceSkip} className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={onForceSkip}
+                      className="border-white/16 bg-white/6 text-white hover:bg-white/12 hover:text-white"
+                    >
                       直接跳过
                     </Button>
                   ) : null}
@@ -582,7 +702,10 @@ export function MainPlayer({
                       onChange={(event) => {
                         const nextVolume = Number(event.target.value);
                         setVolume(nextVolume);
-                        localStorage.setItem("music-volume", String(nextVolume));
+                        localStorage.setItem(
+                          "music-volume",
+                          String(nextVolume),
+                        );
                       }}
                       className="h-1.5 flex-1 cursor-pointer accent-amber-300"
                     />
@@ -593,13 +716,21 @@ export function MainPlayer({
           </>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/6 text-5xl shadow-[0_20px_50px_rgba(0,0,0,0.28)]">♪</div>
-            <h1 className="mt-6 text-3xl font-semibold tracking-tight text-white">还没有正在播放的歌</h1>
+            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/6 text-5xl shadow-[0_20px_50px_rgba(0,0,0,0.28)]">
+              ♪
+            </div>
+            <h1 className="mt-6 text-3xl font-semibold tracking-tight text-white">
+              还没有正在播放的歌
+            </h1>
             <p className="mt-3 max-w-md text-sm leading-7 text-white/58">
               从右侧歌单加歌，房间会按顺序接力播放，播完后自动移到队尾。
             </p>
             {!joined ? (
-              <Button onClick={onJoinRoom} disabled={!canJoin} className="mt-6 bg-white text-slate-950 hover:bg-white/90">
+              <Button
+                onClick={onJoinRoom}
+                disabled={!canJoin}
+                className="mt-6 bg-white text-slate-950 hover:bg-white/90"
+              >
                 {canJoin ? "加入音乐室" : "登录后加入"}
               </Button>
             ) : null}
@@ -610,21 +741,31 @@ export function MainPlayer({
   );
 }
 
-async function refetchBiliUrl(song: Song, serverPosition: number, playbackToken: number, signal: AbortSignal) {
+async function refetchBiliUrl(
+  song: Song,
+  serverPosition: number,
+  playbackToken: number,
+  signal: AbortSignal,
+) {
   const params = new URLSearchParams();
   params.set("source", "bilibili");
   params.set("bvid", song.bvid || "");
   params.set("cid", String(song.cid ?? ""));
 
   try {
-    const response = await fetch(apiUrl(`/api/music/song?${params.toString()}`), { signal });
+    const response = await fetch(
+      apiUrl(`/api/music/song?${params.toString()}`),
+      { signal },
+    );
     const data = await response.json();
     const runtime = getRuntime();
     if (!data.url || playbackToken !== runtime.playbackToken) return;
 
     loadAudioSource(
       runtime.audio,
-      apiUrl(`/api/music/stream?url=${encodeURIComponent(btoa(String(data.url)))}`),
+      apiUrl(
+        `/api/music/stream?url=${encodeURIComponent(btoa(String(data.url)))}`,
+      ),
       serverPosition,
       true,
     );

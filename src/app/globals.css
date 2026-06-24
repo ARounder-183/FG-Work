@@ -132,3 +132,64 @@
 }
 
 /* Theme toggle circular reveal — driven by injected <style> in navbar.tsx */
+
+/* Registered custom properties so the browser can interpolate them smoothly */
+@property --parallax-x {
+  syntax: "<percentage>";
+  initial-value: 0%;
+  inherits: true;
+}
+@property --parallax-y {
+  syntax: "<percentage>";
+  initial-value: 0%;
+  inherits: true;
+}
+
+@keyframes music-cover-breathe-y {
+  from {
+    transform: translate3d(
+      var(--parallax-x, 0%),
+      calc(var(--parallax-y, 0%) - 1.6%),
+      0
+    );
+  }
+  to {
+    transform: translate3d(
+      var(--parallax-x, 0%),
+      calc(var(--parallax-y, 0%) + 2%),
+      0
+    );
+  }
+}
+
+@keyframes music-cover-breathe-x {
+  from {
+    transform: translate3d(-0.8%, 0, 0);
+  }
+  to {
+    transform: translate3d(0.8%, 0, 0);
+  }
+}
+
+.music-cover-float {
+  animation: music-cover-breathe-y 4s ease-in-out infinite alternate;
+  transform-origin: center;
+  will-change: transform;
+  transition: --parallax-x 0.7s ease-out, --parallax-y 0.7s ease-out;
+}
+
+.music-cover-breathe {
+  animation: music-cover-breathe-x 5s ease-in-out infinite alternate;
+  animation-delay: -1.7s;
+  transform-origin: center;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-cover-float,
+  .music-cover-breathe {
+    animation: none;
+    transform: none;
+    transition: none;
+  }
+}
