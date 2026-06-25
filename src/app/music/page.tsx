@@ -194,6 +194,11 @@ export default function MusicPage() {
 
       toast.error(data.error);
     },
+    playbackEnded: async () => {
+      await fetch(apiUrl("/api/music/ended"), { method: "POST" });
+      void fetchState();
+      void fetchMySongs();
+    },
     addSong: async (song: Song) => {
       const response = await fetch(apiUrl("/api/music/queue"), {
         method: "POST",
@@ -272,6 +277,7 @@ export default function MusicPage() {
             onLeaveRoom={api.leave}
             onSkipVote={api.skipVote}
             onForceSkip={api.forceSkip}
+            onPlaybackEnded={api.playbackEnded}
             skipVotes={skipVotes.length}
             skipThreshold={skipThreshold}
             activeUsers={activeUsers}

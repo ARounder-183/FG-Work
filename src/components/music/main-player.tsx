@@ -1,7 +1,7 @@
 "use client";
 
 import { apiUrl, proxyImage } from "@/lib/url";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ParticleBackground } from "@/components/music/particle-background";
@@ -36,6 +36,7 @@ interface Props {
   onLeaveRoom: () => void;
   onSkipVote: () => void;
   onForceSkip: () => void;
+  onPlaybackEnded: () => void;
   skipVotes: number;
   skipThreshold: number;
   activeUsers: ActiveUser[];
@@ -118,6 +119,12 @@ function resetAudio(audio: HTMLAudioElement) {
   audio.currentTime = 0;
 }
 
+function getSongKey(song: Song) {
+  return song.source === "bilibili"
+    ? `bili:${song.bvid ?? song.id}`
+    : `ncm:${song.id}`;
+}
+
 function loadAudioSource(
   audio: HTMLAudioElement,
   sourceUrl: string,
@@ -149,13 +156,18 @@ export function MainPlayer({
   onLeaveRoom,
   onSkipVote,
   onForceSkip,
+  onPlaybackEnded,
   skipVotes,
   skipThreshold,
   activeUsers,
   currentUserId,
   songSubmittedBy,
 }: Props) {
-  const [position, setPosition] = useState(0);
+  const runtime = typeof window === "undefined" ? null : getRuntime();
+  const [position, setPosition] = useState(() => {
+    if (!runtime || !currentSong) return 0;
+    return runtime.lastKey === getSongKey(currentSong) ? runtime.audio.currentTime : 0;
+  });
   const [volume, setVolume] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("music-volume");
@@ -173,13 +185,19 @@ export function MainPlayer({
   const currentSongRef = useRef(currentSong);
   const isPlayingRef = useRef(isPlaying);
   const serverPositionRef = useRef(serverPosition);
-  const endedRetries = useRef(0);
   const errorRetries = useRef(0);
   const seekFailCount = useRef(0);
   const retryTimers = useRef<number[]>([]);
   const sectionRef = useRef<HTMLElement>(null);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const parallaxRef = useRef({ x: 0, y: 0 });
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const progressFrameRef = useRef<number | null>(null);
+  const progressResetTimerRef = useRef<number | null>(null);
+  const pendingProgressStartRef = useRef(false);
+  const positionSecondRef = useRef(-1);
+  const currentSongKey = currentSong ? getSongKey(currentSong) : null;
+  const duration = currentSong?.duration || 0;
 
   const clearRetryTimers = () => {
     retryTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -191,6 +209,118 @@ export function MainPlayer({
     runtime.coverUrl = url;
     setCoverUrlState(url);
   };
+
+  const stopProgressLoop = useCallback(() => {
+    if (progressFrameRef.current !== null) {
+      window.cancelAnimationFrame(progressFrameRef.current);
+      progressFrameRef.current = null;
+    }
+  }, []);
+
+  const updateProgressWidth = useCallback((percent: number) => {
+    const bar = progressBarRef.current;
+    if (!bar) return;
+
+    const clamped = Math.min(Math.max(percent, 0), 100);
+    bar.style.width = `${clamped}%`;
+  }, []);
+
+  const startProgressLoop = useCallback(() => {
+    // Clear any in-flight reset animation so we can take over
+    if (progressResetTimerRef.current !== null) {
+      window.clearTimeout(progressResetTimerRef.current);
+      progressResetTimerRef.current = null;
+    }
+    pendingProgressStartRef.current = false;
+    stopProgressLoop();
+    // Drop any CSS transition — the RAF loop owns the bar now
+    if (progressBarRef.current) progressBarRef.current.style.transition = "";
+
+    const update = () => {
+      const song = currentSongRef.current;
+      if (!song || song.duration <= 0) {
+        updateProgressWidth(0);
+        progressFrameRef.current = null;
+        return;
+      }
+
+      const audio = getRuntime().audio;
+      // Use the browser-detected duration when available — streamed files may
+      // differ from song metadata.  Fall back to metadata while buffering.
+      const effectiveDuration =
+        audio.duration && isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : song.duration;
+      const percent = Math.min((audio.currentTime / effectiveDuration) * 100, 100);
+      updateProgressWidth(percent);
+
+      if (percent >= 100 || !audio.src || audio.paused) {
+        progressFrameRef.current = null;
+        return;
+      }
+
+      progressFrameRef.current = window.requestAnimationFrame(update);
+    };
+
+    progressFrameRef.current = window.requestAnimationFrame(update);
+  }, [stopProgressLoop, updateProgressWidth]);
+
+  const resetProgressThenWaitForSource = useCallback(() => {
+    // Clear any in-flight reset timer
+    if (progressResetTimerRef.current !== null) {
+      window.clearTimeout(progressResetTimerRef.current);
+      progressResetTimerRef.current = null;
+    }
+    stopProgressLoop();
+    pendingProgressStartRef.current = true;
+
+    const bar = progressBarRef.current;
+    if (!bar) {
+      updateProgressWidth(0);
+      return;
+    }
+
+    bar.style.transition = "width 520ms cubic-bezier(0.22, 1, 0.36, 1)";
+    bar.style.width = "0%";
+
+    progressResetTimerRef.current = window.setTimeout(() => {
+      progressResetTimerRef.current = null;
+      if (progressBarRef.current) progressBarRef.current.style.transition = "";
+      if (pendingProgressStartRef.current && getRuntime().audio.src) {
+        startProgressLoop();
+      }
+    }, 520);
+  }, [startProgressLoop, stopProgressLoop, updateProgressWidth]);
+
+  // Sync the progress bar DOM to the current audio position before the
+  // first paint, so the user never sees a flash of an incorrect bar.
+  // On song changes we intentionally leave the bar alone here — the
+  // resetProgressThenWaitForSource call in the next effect will animate
+  // it from its current position to 0.
+  useLayoutEffect(() => {
+    const bar = progressBarRef.current;
+    if (!bar) return;
+
+    if (!currentSong || duration <= 0) {
+      bar.style.width = "0%";
+      return;
+    }
+
+    const runtime = getRuntime();
+    if (runtime.lastKey !== currentSongKey) {
+      // New song — don't touch the bar; let resetProgressThenWaitForSource
+      // run the animated transition from the current position to 0.
+      return;
+    }
+
+    // Same song continuing (e.g. page navigation back to /music) — show current position
+    const pct = Math.min((runtime.audio.currentTime / duration) * 100, 100);
+    bar.style.width = `${pct}%`;
+    // currentSongKey + duration capture song identity; we intentionally
+    // avoid depending on the currentSong object reference (it changes on
+    // every poll, but the identity fields stay stable for the same song).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSongKey, duration]);
 
   useEffect(() => {
     currentSongRef.current = currentSong;
@@ -214,25 +344,21 @@ export function MainPlayer({
     const audio = runtime.audio;
     setPosition(audio.currentTime);
 
-    const onTime = () => setPosition(audio.currentTime);
+    const onTime = () => {
+      const nextSecond = Math.floor(audio.currentTime);
+      if (nextSecond !== positionSecondRef.current) {
+        positionSecondRef.current = nextSecond;
+        setPosition(audio.currentTime);
+      }
+    };
     const onEnd = () => {
       clearRetryTimers();
-
-      const song = currentSongRef.current;
-      const playedEnough =
-        song && song.duration > 0 && audio.currentTime >= song.duration * 0.9;
-      if (!playedEnough && endedRetries.current < 3) {
-        endedRetries.current += 1;
-        const expectedToken = runtime.playbackToken;
-        const timer = window.setTimeout(() => {
-          const latest = getRuntime();
-          if (latest.playbackToken !== expectedToken) return;
-          if (latest.audio.src && latest.audio.paused) {
-            latest.audio.play().catch(() => {});
-          }
-        }, 1000);
-        retryTimers.current.push(timer);
-      }
+      stopProgressLoop();
+      // RAF already painted the bar at or extremely close to 100 % on its
+      // last frame.  Don't touch it — any extra set / transition here is a
+      // visible artefact.  resetProgressThenWaitForSource will animate it
+      // to 0 % when the next song arrives.
+      onPlaybackEnded();
     };
 
     const onError = () => {
@@ -266,17 +392,41 @@ export function MainPlayer({
       }
     };
 
+    const onPlay = () => startProgressLoop();
+    const onPause = () => stopProgressLoop();
+
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("ended", onEnd);
     audio.addEventListener("error", onError);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
 
     return () => {
       clearRetryTimers();
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("ended", onEnd);
       audio.removeEventListener("error", onError);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
     };
-  }, []);
+  }, [onPlaybackEnded, startProgressLoop, stopProgressLoop, updateProgressWidth]);
+
+  // Progress bar is paint-only: width is updated from the audio clock via
+  // requestAnimationFrame while playback is active. React does not drive the
+  // bar style, avoiding unnecessary re-renders and keeping animation at
+  // native FPS.
+  useEffect(() => {
+    if (!currentSong) {
+      stopProgressLoop();
+      updateProgressWidth(0);
+      return;
+    }
+
+    if (getRuntime().lastKey !== currentSongKey) return;
+
+    if (isPlaying) startProgressLoop();
+    return stopProgressLoop;
+  }, [currentSong, currentSongKey, isPlaying, startProgressLoop, stopProgressLoop, updateProgressWidth]);
 
   useEffect(() => {
     const runtime = getRuntime();
@@ -288,20 +438,17 @@ export function MainPlayer({
       abortInflightRequests(runtime);
       clearRetryTimers();
       resetAudio(audio);
-      endedRetries.current = 0;
       errorRetries.current = 0;
       seekFailCount.current = 0;
       setPosition(0);
       setCoverUrl(null);
       setLyric(null);
       setCurrentLine("");
+      resetProgressThenWaitForSource();
       return;
     }
 
-    const songKey =
-      currentSong.source === "bilibili"
-        ? `bili:${currentSong.bvid ?? currentSong.id}`
-        : `ncm:${currentSong.id}`;
+    const songKey = getSongKey(currentSong);
 
     setPosition(audio.currentTime);
 
@@ -320,13 +467,13 @@ export function MainPlayer({
     runtime.lastKey = songKey;
     abortInflightRequests(runtime);
     clearRetryTimers();
-    endedRetries.current = 0;
     errorRetries.current = 0;
     seekFailCount.current = 0;
     setPosition(0);
     setLyric(null);
     setCurrentLine("");
     resetAudio(audio);
+    resetProgressThenWaitForSource();
 
     runtime.sourceController = new AbortController();
 
@@ -336,6 +483,7 @@ export function MainPlayer({
         serverPositionRef.current,
         playbackToken,
         runtime.sourceController.signal,
+        startProgressLoop,
       );
       return;
     }
@@ -373,13 +521,14 @@ export function MainPlayer({
           serverPositionRef.current,
           isPlayingRef.current,
         );
+        startProgressLoop();
       })
       .catch((error) => {
         if (!isAbortError(error)) {
           // Ignore source errors here; audio element error handler will retry when possible.
         }
       });
-  }, [currentSong]);
+  }, [currentSong, resetProgressThenWaitForSource, startProgressLoop]);
 
   useEffect(() => {
     const runtime = getRuntime();
@@ -460,28 +609,22 @@ export function MainPlayer({
     return () => audio.removeEventListener("timeupdate", update);
   }, [lyric]);
 
+  // Correct large clock drifts between audio element and server authority.
+  // Only triggers when the gap is significant and we're not near the song end,
+  // so it doesn't cause perceptible jumps during normal playback.
   useEffect(() => {
     const audio = getRuntime().audio;
-    if (!audio.src) return;
+    if (!audio.src || duration <= 0) return;
 
     const drift = Math.abs(audio.currentTime - serverPosition);
-    if (drift > 1.5 && seekFailCount.current < 10) {
+    // Guard: don't seek near the end — the ended event will handle it naturally
+    if (drift > 5 && seekFailCount.current < 3 && audio.currentTime < duration - 10) {
+      seekFailCount.current += 1;
       audio.currentTime = serverPosition;
-      window.setTimeout(() => {
-        if (Math.abs(audio.currentTime - serverPosition) > 3) {
-          seekFailCount.current += 1;
-        }
-      }, 600);
+      startProgressLoop();
     }
-  }, [serverPosition]);
+  }, [serverPosition, duration, startProgressLoop]);
 
-  const duration = currentSong?.duration || 0;
-  // Drive the progress bar from the local `position` (updated via the audio
-  // element's timeupdate event ~4x/s). serverPosition is only used as a drift
-  // corrector — it moves audio.currentTime, which then flows back into
-  // `position`, instead of the bar jumping straight to it every poll.
-  const progress =
-    duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
   const sourceLabel =
     currentSong?.source === "bilibili" ? "Bilibili 音频" : "网易云音乐";
 
@@ -671,8 +814,9 @@ export function MainPlayer({
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-sky-300 transition-all duration-700"
-                      style={{ width: `${progress}%` }}
+                      ref={progressBarRef}
+                      className="h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-sky-300 will-change-[width]"
+                      style={{ width: "0%" }}
                     />
                   </div>
                 </div>
@@ -757,6 +901,7 @@ async function refetchBiliUrl(
   serverPosition: number,
   playbackToken: number,
   signal: AbortSignal,
+  onReady?: () => void,
 ) {
   const params = new URLSearchParams();
   params.set("source", "bilibili");
@@ -780,6 +925,7 @@ async function refetchBiliUrl(
       serverPosition,
       true,
     );
+    onReady?.();
   } catch (error) {
     if (!isAbortError(error)) {
       // Ignore and let polling / next retry recover.

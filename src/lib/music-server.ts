@@ -19,6 +19,11 @@ interface SongData {
 
 const TICK_MS = 500;
 const ADVANCE_COOLDOWN_MS = 1000;
+// Generous grace period so the client's "ended" event (which fires based on
+// real audio-clock time) reaches /api/music/ended before the server timer.
+// Bilibili sources can take 2–3 s to load, which offsets the audio clock from
+// the server startedAt; a 4 s grace still feels responsive as a fallback.
+const AUTO_ADVANCE_GRACE_MS = 4000;
 
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -48,7 +53,7 @@ async function tick(): Promise<void> {
     if (duration <= 0 || !startedAt) return;
 
     const elapsed = (Date.now() - startedAt) / 1000;
-    if (elapsed >= duration) {
+    if (elapsed * 1000 >= duration * 1000 + AUTO_ADVANCE_GRACE_MS) {
       await advanceToNextSong();
     }
   } catch {
